@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { register } from 'node:module';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -31,7 +31,7 @@ function registration(config = admin) {
 test('public authoring factory retains strict complete metadata without invented tools', () => {
   assert.equal(metadata.id, 'dsa-workbench'); assert.deepEqual(metadata.tools, []);
   assert.equal(metadata.configSchema.additionalProperties, false);
-  assert.deepEqual(metadata.configSchema.required, ['dbPath', 'staticDir']);
+  assert.equal(metadata.configSchema.required, undefined);
   assert.deepEqual(Object.keys(metadata.configSchema.properties).sort(), ['dbPath', 'staticDir', 'tailscaleBin', 'tailscaleLogin', 'cloudflareAccessHost', 'cloudflareAccessIssuer', 'cloudflareAccessAudience', 'cloudflareAccessEmail'].sort());
   const manifest = JSON.parse(readFileSync('openclaw.plugin.json', 'utf8'));
   assert.deepEqual(metadata.configSchema, manifest.configSchema);
@@ -45,11 +45,39 @@ test('actual host SDK composition registers only the original descriptor and gua
   assert.equal(routes[0].match, 'prefix'); assert.equal(routes[0].auth, 'plugin');
 });
 
-test('schema and composed registration reject missing paths, unknown config and incomplete Access', () => {
+test('strict optional installation schema accepts empty config without weakening business parser', () => {
   assert.equal(plugin.configSchema.safeParse(admin).success, true);
-  for (const value of [{}, { dbPath: admin.dbPath }, { ...admin, extra: true }, { ...admin, staticDir: 1 }]) assert.equal(plugin.configSchema.safeParse(value).success, false);
-  for (const value of [{}, { dbPath: admin.dbPath }, { ...admin, staticDir: 'relative' }, { ...admin, dbPath: 'relative.db' }, { ...admin, extra: 'not-allowed' }, { ...admin, cloudflareAccessHost: 'dsa.example.invalid' }, { ...admin, cloudflareAccessEmail: 'owner@example.invalid' }]) assert.throws(() => registration(value));
+  for (const value of [{}, { dbPath: admin.dbPath }]) assert.equal(plugin.configSchema.safeParse(value).success, true);
+  for (const value of [{ ...admin, extra: true }, { ...admin, staticDir: 1 }, { ...admin, dbPath: '' }]) assert.equal(plugin.configSchema.safeParse(value).success, false);
+  for (const value of [{}, { dbPath: admin.dbPath }, { ...admin, staticDir: 'relative' }, { ...admin, dbPath: 'relative.db' }, { ...admin, extra: 'not-allowed' }, { ...admin, cloudflareAccessHost: 'dsa.example.invalid' }, { ...admin, cloudflareAccessEmail: 'owner@example.invalid' }]) assert.doesNotThrow(() => registration(value));
   registration({ ...admin, cloudflareAccessHost: 'dsa.example.invalid', cloudflareAccessIssuer: 'https://fixture.cloudflareaccess.com', cloudflareAccessAudience: 'fixture' });
+});
+
+test('empty, incomplete and invalid initial configs stay guarded 503 with no local business or acquisition', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsa-inert-'));
+  const missingDatabase = join(root, 'must-not-create.db');
+  const values = [undefined, {}, { dbPath: missingDatabase }, { dbPath: missingDatabase, staticDir: '/must-not-read-static' }, { ...admin, staticDir: 'relative' }, { ...admin, cloudflareAccessHost: 'dsa.example.invalid' }, { ...admin, cloudflareAccessEmail: 'owner@example.invalid' }, { ...admin, extra: 'do-not-trust' }];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = () => { throw new Error('Inactive plugin must not fetch or initialize a client'); };
+  try {
+    for (const value of values) {
+      const { routes } = registration(value === undefined ? {} : value);
+      const server = createServer(routes[0].handler);
+      try {
+        await new Promise(done => server.listen(0, '127.0.0.1', done)); const port = server.address().port;
+        for (const path of ['/plugins/dsa-workbench/', '/plugins/dsa-workbench/overview.css', '/plugins/dsa-workbench/app/', '/plugins/dsa-workbench/app/api/v1/auth/status', '/plugins/dsa-workbench/app/api/v1/history']) {
+          const result = await nativeRequest({ port, path });
+          assert.equal(result.status, 503); assert.equal(JSON.parse(result.text).error, 'dsa_workbench_not_configured');
+          assert.doesNotMatch(result.text, /NVDA|saved-report|must-not-read-static|fixture-do-not-create|<script|<form/);
+        }
+        assert.equal((await nativeRequest({ port, path: '/plugins/dsa-workbench/', method: 'HEAD' })).status, 503);
+        const write = await nativeRequest({ port, path: '/plugins/dsa-workbench/app/api/v1/auth/login', method: 'POST', body: '{"password":"fixture-only"}' });
+        assert.equal(write.status, 503); assert.equal(write.headers['set-cookie'], undefined);
+        for (const headers of [{ host: 'unknown.invalid' }, { host: '127.0.0.1', 'x-forwarded-for': '203.0.113.1' }, { host: 'dsa.example.invalid', 'x-forwarded-proto': 'https', 'cf-access-jwt-assertion': 'not-a-real-token' }]) assert.equal((await nativeRequest({ port, path: '/plugins/dsa-workbench/', headers })).status, 401);
+        assert.equal(existsSync(missingDatabase), false);
+      } finally { server.closeAllConnections(); await new Promise(done => server.close(done)); }
+    }
+  } finally { globalThis.fetch = originalFetch; rmSync(root, { recursive: true }); }
 });
 
 test('single-backend embedded catalog preserves every original app resource byte', () => {
@@ -107,6 +135,18 @@ test('registered entry retains escaped readonly reports, exact CSS and full RS25
     for (const extra of [{ email: '' }, { email: null }, { iss: 'https://wrong.cloudflareaccess.com' }, { aud: 'wrong' }, { exp: 1 }, { nbf: Math.floor(Date.now() / 1000) + 600 }]) assert.equal((await call(paths[0], { headers: { ...headers, 'cf-access-jwt-assertion': token(extra) } })).status, 401);
     assert.equal((await call(paths[0], { headers: { ...headers, 'cf-access-jwt-assertion': token().slice(0, -12) + 'invalidbytes' } })).status, 401);
     for (const spoof of [{ host: 'untrusted.invalid' }, { host: '127.0.0.1', 'x-forwarded-for': '203.0.113.1' }]) assert.equal((await call(paths[0], { headers: spoof })).status, 401);
+    // A complete valid identity does not make missing business paths usable.
+    const partial = { ...config }; delete partial.staticDir;
+    const inactive = createServer(registration(partial).routes[0].handler);
+    try {
+      await new Promise(done => inactive.listen(0, '127.0.0.1', done));
+      const inactivePort = inactive.address().port;
+      assert.equal((await nativeRequest({ port: inactivePort, path: paths[0], headers })).status, 401);
+      for (const path of paths) {
+        const result = await nativeRequest({ port: inactivePort, path, headers: authenticated });
+        assert.equal(result.status, 503); assert.equal(JSON.parse(result.text).error, 'dsa_workbench_not_configured');
+      }
+    } finally { inactive.closeAllConnections(); await new Promise(done => inactive.close(done)); }
     assert.deepEqual(readFileSync(dbPath), before);
   } finally {
     globalThis.fetch = originalFetch; server.closeAllConnections();

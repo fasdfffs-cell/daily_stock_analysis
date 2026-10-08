@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-- [修复] DSA 同域插件用公开作者 SDK 生成完整严格配置元数据，保留零新增工具及原身份／代理守卫；CSS 和完整原版资源字节内嵌单入口，支持正式 build／validate／pack 与 System artifact 审批，不用删脚本、Labs 或私有 loader 绕过校验。
+- [修复] DSA 同域插件用公开作者 SDK 生成完整严格配置元数据，保留零新增工具及原身份／代理守卫；空配置首次安装仅受保护 503，完整管理员路径和身份配置后才启用业务；CSS 和完整原版资源字节内嵌单入口，支持正式 build／validate／pack 与 System artifact 审批，不用删脚本、Labs 或私有 loader 绕过校验。
 
 - [新功能] 增加可审查的 DSA 原生 OpenClaw 插件：股票研究侧栏只读原报告，同域顶层复用完整 React 手动工作台；逐请求身份验证与受限 loopback 代理，不放宽 iframe 或自动安装／重启。
 - [测试] 覆盖原工作台前缀／登录重定向、Access 可选 email、Cookie／Origin、静态路径与 SSE 清理；本地 fixture 与 owner 首次激活边界分开。

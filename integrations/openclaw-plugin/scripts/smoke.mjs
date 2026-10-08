@@ -7,9 +7,10 @@ const plugin = (await import(process.argv[2] ? pathToFileURL(resolve(process.arg
 const { getToolPluginMetadata } = await import('openclaw/plugin-sdk/tool-plugin');
 const metadata = getToolPluginMetadata(plugin);
 assert.ok(metadata); assert.deepEqual(metadata.tools, []);
-assert.deepEqual(metadata.configSchema.required, ['dbPath', 'staticDir']);
+assert.equal(metadata.configSchema.required, undefined);
 assert.equal(metadata.configSchema.additionalProperties, false);
 assert.equal(Object.keys(metadata.configSchema.properties).length, 8);
+assert.equal(plugin.configSchema.safeParse({}).success, true);
 assert.equal(plugin.configSchema.safeParse({ dbPath: resolve('fixture-do-not-create.db'), staticDir: resolve('app') }).success, true);
 assert.equal(plugin.configSchema.safeParse({ dbPath: resolve('fixture-do-not-create.db'), staticDir: resolve('app'), targetUrl: 'https://other.invalid' }).success, false);
 const descriptors = [], routes = [];

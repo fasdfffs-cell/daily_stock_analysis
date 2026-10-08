@@ -9,10 +9,6 @@
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
-    "required": [
-      "dbPath",
-      "staticDir"
-    ],
     "properties": {
       "dbPath": {
         "type": "string",

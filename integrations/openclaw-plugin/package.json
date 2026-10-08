@@ -39,7 +39,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "check": "node scripts/build.mjs --check",
-    "test": "npm run build && node --test test/*.test.mjs",
+    "test": "npm run plugin:build && node --test test/*.test.mjs",
     "smoke": "node scripts/smoke.mjs",
     "plugin:build": "npm run build && openclaw plugins build --root .",
     "plugin:validate": "openclaw plugins validate --root . --json",
