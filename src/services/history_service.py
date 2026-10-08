@@ -743,6 +743,10 @@ class HistoryService:
         Convert an AnalysisHistory ORM record to a detail response dict.
         """
         raw_result = parse_json_field(record.raw_result)
+        from src.workbench import is_manual_workbench, normalize_manual_snapshot
+        if is_manual_workbench() and isinstance(raw_result, dict):
+            raw_result = dict(raw_result)
+            raw_result["market_snapshot"] = normalize_manual_snapshot(raw_result.get("market_snapshot"))
 
         model_used = (raw_result or {}).get("model_used") if isinstance(raw_result, dict) else None
         model_used = normalize_model_used(model_used)
@@ -1024,7 +1028,8 @@ class HistoryService:
 
         # Generate Markdown report
         try:
-            return self._generate_single_stock_markdown(result, record)
+            from src.workbench import annotate_manual_markdown
+            return annotate_manual_markdown(self._generate_single_stock_markdown(result, record), raw_result)
         except Exception as e:
             logger.error(f"get_markdown_report: failed to generate markdown for {record_id}: {e}", exc_info=True)
             raise MarkdownReportGenerationError(

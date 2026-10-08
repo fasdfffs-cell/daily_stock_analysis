@@ -322,3 +322,16 @@ def test_safe_gateway_error_category_without_messages(text, category, code):
     assert value.error_code == code and value.stage == 'gateway'
     assert value.details['category'] == category and value.details['status'] == 'exit_1'
     assert 'secret' not in json.dumps(value.details) and 'do-not-copy' not in json.dumps(value.details)
+
+
+def test_manual_report_daily_date_currency_and_model_disclosure(manual_client):
+    from src.workbench import normalize_manual_snapshot, annotate_manual_markdown
+    raw = {"model_used": "fixture/actual", "market_snapshot": {"date": "2026-10-07", "close": "237.47", "amount": "193.50 亿元"}}
+    before = json.dumps(raw)
+    snapshot = normalize_manual_snapshot(raw["market_snapshot"])
+    assert snapshot["currency"] == "USD" and snapshot["amount"] == "193.50 亿美元"
+    text = annotate_manual_markdown("# Report\n### 📈 当日行情\n| 当前价 | 237.47 |\n| 成交额 | 193.50 亿元 |", raw)
+    assert "实际模型：fixture/actual" in text and "日线截至：2026-10-07" in text
+    assert "并非实时行情" in text and "完整日线行情（2026-10-07）" in text
+    assert "193.50 亿美元" in text and "237.47" in text
+    assert json.dumps(raw) == before

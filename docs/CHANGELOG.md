@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [修复] 私人美股历史报告明确最后完整日线日期、自动复权／USD 和实际模型，纠正原通用成交额“元”标签；不将保存日线称作当日实时行情，不改写模型结论或数值。
+
 - [修复] 私人工作台按保存的进程组清理已退出 CLI 的管道子进程（含忽略 TERM 的后代），HTTPS Cookie Secure 由校验后的固定入口决定而非不可信转发头。
 - [改进] OpenClaw 文本后端采用官方 Gateway agent/modelRun 隔离调用延长客户端等待至最多 600 秒，保留 max、禁 tools/MCP 与原路由策略，校验完整 JSON argv 预算并分类安全失败。
 
