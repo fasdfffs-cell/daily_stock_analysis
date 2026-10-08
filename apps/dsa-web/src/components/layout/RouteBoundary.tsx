@@ -1,3 +1,4 @@
+import { appPath } from '../../utils/appBase';
 import type React from 'react';
 import { Component, Suspense } from 'react';
 import type { ErrorInfo } from 'react';
@@ -84,7 +85,7 @@ class RouteErrorBoundary extends Component<RouteErrorBoundaryProps, RouteErrorBo
             <button
               type="button"
               className="rounded-xl border border-border/70 bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-hover"
-              onClick={() => window.location.assign('/')}
+              onClick={() => window.location.assign(appPath('/'))}
             >
               {this.props.text.backHome}
             </button>

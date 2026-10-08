@@ -1,0 +1,91 @@
+{
+  "id": "dsa-workbench",
+  "name": "DSA Workbench",
+  "description": "Read-only stock reports and a guarded same-origin top-level original manual workbench.",
+  "version": "0.1.0",
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "dbPath"
+    ],
+    "properties": {
+      "dbPath": {
+        "type": "string",
+        "minLength": 1
+      },
+      "staticDir": {
+        "type": "string",
+        "minLength": 1
+      },
+      "tailscaleBin": {
+        "type": "string",
+        "default": "/usr/bin/tailscale"
+      },
+      "tailscaleLogin": {
+        "type": "string",
+        "default": "",
+        "maxLength": 320
+      },
+      "cloudflareAccessHost": {
+        "type": "string",
+        "default": "",
+        "maxLength": 253
+      },
+      "cloudflareAccessIssuer": {
+        "type": "string",
+        "default": "",
+        "maxLength": 512
+      },
+      "cloudflareAccessAudience": {
+        "type": "string",
+        "default": "",
+        "maxLength": 2048
+      },
+      "cloudflareAccessEmail": {
+        "type": "string",
+        "default": "",
+        "maxLength": 320
+      }
+    }
+  },
+  "uiHints": {
+    "dbPath": {
+      "label": "dbPath",
+      "help": "Admin-only absolute path; never supplied by HTTP clients."
+    },
+    "staticDir": {
+      "label": "staticDir",
+      "help": "Admin-only absolute path; never supplied by HTTP clients."
+    },
+    "tailscaleBin": {
+      "label": "tailscaleBin",
+      "help": "Existing private ingress identity; do not auto-populate or relax."
+    },
+    "tailscaleLogin": {
+      "label": "tailscaleLogin",
+      "help": "Existing private ingress identity; do not auto-populate or relax."
+    },
+    "cloudflareAccessHost": {
+      "label": "cloudflareAccessHost",
+      "help": "Existing private ingress identity; do not auto-populate or relax."
+    },
+    "cloudflareAccessIssuer": {
+      "label": "cloudflareAccessIssuer",
+      "help": "Existing private ingress identity; do not auto-populate or relax."
+    },
+    "cloudflareAccessAudience": {
+      "label": "cloudflareAccessAudience",
+      "help": "Existing private ingress identity; do not auto-populate or relax.",
+      "sensitive": true
+    },
+    "cloudflareAccessEmail": {
+      "label": "cloudflareAccessEmail",
+      "help": "Existing private ingress identity; do not auto-populate or relax.",
+      "sensitive": true
+    }
+  }
+}

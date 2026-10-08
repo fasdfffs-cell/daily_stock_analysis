@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
+import { normalizeWorkbenchBasePath } from './src/utils/basePath'
 
 const frontendDir = __dirname
 const repoRoot = path.resolve(frontendDir, '../..')
@@ -125,6 +126,7 @@ const buildMetadataPlugin = (): Plugin => ({
         revision: appRevision,
         buildTime,
         sourceFingerprint,
+        basePath: workbenchBasePath,
       }, null, 2)}\n`,
     })
   },
@@ -212,7 +214,15 @@ const getVendorChunkName = (id: string): string | undefined => {
 }
 
 // https://vite.dev/config/
-export default defineConfig({
+let workbenchBasePath = ''
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, frontendDir, 'VITE_')
+  workbenchBasePath = normalizeWorkbenchBasePath(process.env.VITE_WORKBENCH_BASE_PATH || env.VITE_WORKBENCH_BASE_PATH)
+  if (workbenchBasePath && (process.env.VITE_API_URL || env.VITE_API_URL)) {
+    throw new Error('A prefixed same-origin workbench cannot use VITE_API_URL')
+  }
+  return {
+  base: `${workbenchBasePath}/`,
   define: {
     __APP_PACKAGE_VERSION__: JSON.stringify(appVersion),
     __APP_REVISION__: JSON.stringify(appRevision),
@@ -239,7 +249,7 @@ export default defineConfig({
   },
   build: {
     // 打包输出到项目根目录的 static 文件夹
-    outDir: path.resolve(__dirname, '../../static'),
+    outDir: path.resolve(__dirname, workbenchBasePath ? '../../static-gateway' : '../../static'),
     emptyOutDir: true,
     rollupOptions: {
       output: {
@@ -247,4 +257,5 @@ export default defineConfig({
       },
     },
   },
+  }
 })

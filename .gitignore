@@ -91,3 +91,10 @@ static/
 /apps/dsa-web/node_modules/
 /.workbench/
 docs/specs/
+
+# Separate same-origin Gateway bundle and private local plugin build/package evidence
+/static-gateway/
+/integrations/openclaw-plugin/node_modules/
+/integrations/openclaw-plugin/app/
+/integrations/openclaw-plugin/.tsconfig.host.json
+/integrations/openclaw-plugin/*.tgz

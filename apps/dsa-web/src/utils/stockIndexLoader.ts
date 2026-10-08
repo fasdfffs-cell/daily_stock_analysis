@@ -6,6 +6,7 @@
 
 import type { StockIndexData, StockIndexItem, StockIndexTuple } from '../types/stockIndex';
 import { INDEX_FIELD } from './stockIndexFields';
+import { appPath } from './appBase';
 
 const STOCK_INDEX_LOAD_TIMEOUT_MS = 10_000;
 
@@ -34,7 +35,7 @@ export async function loadStockIndex(): Promise<IndexLoadResult> {
   try {
     // Add time parameter to bypass cache (in case the backend doesn't handle ETag/Cache-Control)
     const response = await fetch(
-      `/stocks.index.json?_t=${Math.floor(Date.now() / 3600000)}`,
+      `${appPath('/stocks.index.json')}?_t=${Math.floor(Date.now() / 3600000)}`,
       { signal: abortController.signal },
     );
 

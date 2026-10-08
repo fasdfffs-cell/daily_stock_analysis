@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [新功能] 增加可审查的 DSA 原生 OpenClaw 插件：股票研究侧栏只读原报告，同域顶层复用完整 React 手动工作台；逐请求身份验证与受限 loopback 代理，不放宽 iframe 或自动安装／重启。
+- [测试] 覆盖原工作台前缀／登录重定向、Access 可选 email、Cookie／Origin、静态路径与 SSE 清理；本地 fixture 与 owner 首次激活边界分开。
+
 - [修复] 私人美股历史报告明确最后完整日线日期、自动复权／USD 和实际模型，纠正原通用成交额“元”标签；不将保存日线称作当日实时行情，不改写模型结论或数值。
 
 - [修复] 私人工作台按保存的进程组清理已退出 CLI 的管道子进程（含忽略 TERM 的后代），HTTPS Cookie Secure 由校验后的固定入口决定而非不可信转发头。

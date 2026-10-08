@@ -19,6 +19,7 @@ import { resolveLoginRedirect } from './utils/loginRedirect';
 import './App.css';
 import { MANUAL_WORKBENCH } from './utils/workbench';
 import { WorkbenchDisabledPage } from './components/layout/WorkbenchNotice';
+import { appPath, WORKBENCH_BASE_PATH } from './utils/appBase';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
 const BacktestPage = lazy(() => import('./pages/BacktestPage'));
@@ -71,7 +72,7 @@ const AppContent: React.FC = () => {
         </StandaloneRouteBoundary>
       );
     }
-    const redirect = encodeURIComponent(location.pathname + location.search + location.hash);
+    const redirect = encodeURIComponent(appPath(location.pathname) + location.search + location.hash);
     return <Navigate to={`/login?redirect=${redirect}`} replace />;
   }
 
@@ -118,7 +119,7 @@ const App: React.FC = () => {
           children: routeChildren.map((route) => MANUAL_WORKBENCH && route.path !== '/' && route.path !== '*'
             ? { ...route, element: <WorkbenchDisabledPage /> } : route),
         },
-      ]),
+      ], { basename: WORKBENCH_BASE_PATH || '/' }),
     [],
   );
 
