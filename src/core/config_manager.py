@@ -181,6 +181,10 @@ class ConfigManager:
         mask_token: str,
     ) -> Tuple[List[str], List[str], str]:
         """Apply updates into `.env` file using atomic replace when possible."""
+        from src.workbench import is_manual_workbench
+        updates = list(updates)
+        if is_manual_workbench() and any(key.upper() != "STOCK_LIST" for key, _ in updates):
+            raise RuntimeError("Manual workbench only permits watchlist configuration")
         with self._lock:
             current_values = self.read_config_map()
             stored_values = self._read_config_map(normalize_values=False)

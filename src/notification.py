@@ -288,6 +288,17 @@ class NotificationService(
     注意：所有已配置的渠道都会收到推送
     """
 
+    def __getattribute__(self, name):
+        # A final sink guard, including inherited channel senders. Rendering
+        # and local report saving remain available; outgoing writes do not.
+        if name.startswith(("send", "_send")):
+            from src.workbench import is_manual_workbench, prohibit_outbound
+            if is_manual_workbench():
+                def blocked(*args, **kwargs):
+                    prohibit_outbound()
+                return blocked
+        return super().__getattribute__(name)
+
     def __init__(self, source_message: Optional[BotMessage] = None):
         """
         初始化通知服务
@@ -2911,7 +2922,9 @@ class NotificationService(
             filename = f"report_{date_str}.md"
 
         # 确保 reports 目录存在（使用项目根目录下的 reports）
-        reports_dir = Path(__file__).parent.parent / 'reports'
+        from src.workbench import is_manual_workbench
+        reports_dir = (Path(os.environ["WORKBENCH_STATE_DIR"]) / "reports" if is_manual_workbench()
+                       else Path(__file__).parent.parent / "reports")
         reports_dir.mkdir(parents=True, exist_ok=True)
 
         filepath = reports_dir / filename

@@ -16,6 +16,7 @@ from enum import Enum
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 from src.utils.analysis_metadata import SELECTION_SOURCE_PATTERN
 from src.utils.market_review_region import normalize_market_review_region_strict
+from src.workbench import is_manual_workbench
 
 
 class TaskStatusEnum(str, Enum):
@@ -78,7 +79,7 @@ class AnalyzeRequest(BaseModel):
         json_schema_extra={"example": "autocomplete"},
     )
     notify: bool = Field(
-        True,
+        default_factory=lambda: not is_manual_workbench(),
         description="是否发送推送通知（Telegram/企业微信等）"
     )
     report_language: Optional[Literal["zh", "en", "ko"]] = Field(

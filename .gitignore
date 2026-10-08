@@ -88,4 +88,6 @@ static/
 /apps/dsa-desktop/dist/
 /apps/dsa-desktop/node_modules/
 /node_modules/
+/apps/dsa-web/node_modules/
+/.workbench/
 docs/specs/

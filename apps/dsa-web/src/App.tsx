@@ -17,6 +17,8 @@ import { UiLanguageProvider, useUiLanguage } from './contexts/UiLanguageContext'
 import { useAgentChatStore } from './stores/agentChatStore';
 import { resolveLoginRedirect } from './utils/loginRedirect';
 import './App.css';
+import { MANUAL_WORKBENCH } from './utils/workbench';
+import { WorkbenchDisabledPage } from './components/layout/WorkbenchNotice';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
 const BacktestPage = lazy(() => import('./pages/BacktestPage'));
@@ -113,7 +115,8 @@ const App: React.FC = () => {
       createBrowserRouter([
         {
           element: <AppContent />,
-          children: routeChildren,
+          children: routeChildren.map((route) => MANUAL_WORKBENCH && route.path !== '/' && route.path !== '*'
+            ? { ...route, element: <WorkbenchDisabledPage /> } : route),
         },
       ]),
     [],

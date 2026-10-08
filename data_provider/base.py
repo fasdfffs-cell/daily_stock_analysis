@@ -1804,6 +1804,12 @@ class DataFetcherManager:
           4. YfinanceFetcher (Priority 4)
           5. TencentFetcher (Priority 5) - A 股最终兜底
         """
+        from src.workbench import is_manual_workbench
+        if is_manual_workbench():
+            from .yfinance_fetcher import YfinanceFetcher
+            self._fetchers = [YfinanceFetcher()]
+            self._refresh_fetcher_indexes_locked()
+            return
         from src.config import get_config
         from .efinance_fetcher import EfinanceFetcher
         from .tencent_fetcher import TencentFetcher

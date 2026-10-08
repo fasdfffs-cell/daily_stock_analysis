@@ -20,6 +20,9 @@ def create_generation_backend(
     """Create the configured generation backend."""
 
     normalized = (backend_id or "").strip().lower()
+    if normalized == "openclaw_cli":
+        from src.llm.openclaw_backend import OpenClawGenerationBackend
+        return OpenClawGenerationBackend(config)
     if normalized == LITELLM_BACKEND_ID:
         if litellm_completion_callable is None:
             raise GenerationError(

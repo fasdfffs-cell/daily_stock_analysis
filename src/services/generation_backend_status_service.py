@@ -495,6 +495,9 @@ class GenerationBackendStatusService:
         numeric_error = self._numeric_config_error_for_backend(backend_id)
         if numeric_error is not None:
             return numeric_error
+        if backend_id == "openclaw_cli":
+            from src.llm.openclaw_backend import OpenClawGenerationBackend
+            return OpenClawGenerationBackend(config).get_config_error()
         if backend_id in LOCAL_CLI_GENERATION_BACKEND_IDS:
             preset = resolve_local_cli_preset(backend_id)
             return LocalCliGenerationBackend(config, preset_id=backend_id, preset=preset).get_config_error()
@@ -656,6 +659,9 @@ class GenerationBackendStatusService:
     @staticmethod
     def _capabilities_for_backend(backend_id: str) -> GenerationCapabilities:
         if backend_id in LOCAL_CLI_GENERATION_BACKEND_IDS:
+            if backend_id == "openclaw_cli":
+                from src.llm.openclaw_backend import OpenClawGenerationBackend
+                return OpenClawGenerationBackend.capabilities
             return LocalCliGenerationBackend.capabilities
         return GenerationCapabilities(
             supports_json=True,

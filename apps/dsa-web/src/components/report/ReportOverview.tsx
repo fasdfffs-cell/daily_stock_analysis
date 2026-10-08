@@ -288,6 +288,8 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                     {formatDateTime(meta.createdAt)}
+                    {meta.modelUsed ? <span className="ml-3">实际模型：{meta.modelUsed}</span> : null}
+                    {meta.marketPhaseSummary?.effectiveDailyBarDate ? <span className="ml-3">日线截至：{meta.marketPhaseSummary.effectiveDailyBarDate}</span> : null}
                   </span>
                 </div>
               </div>

@@ -9,6 +9,7 @@ import { cn } from '../../utils/cn';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import { UiLanguageToggle } from '../i18n/UiLanguageToggle';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { WorkbenchNotice } from './WorkbenchNotice';
 
 type ShellProps = {
   children?: React.ReactNode;
@@ -69,6 +70,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
         </aside>
 
         <main className="min-h-0 min-w-0 flex-1 pt-14 lg:pl-3 lg:pt-0 touch-pan-y">
+          <WorkbenchNotice />
           {children ?? <Outlet />}
         </main>
       </div>

@@ -1,9 +1,12 @@
 # feishu_doc.py
 # -*- coding: utf-8 -*-
+from __future__ import annotations
 import logging
 import json
-import lark_oapi as lark
-from lark_oapi.api.docx.v1 import *
+from src.workbench import is_manual_workbench
+if not is_manual_workbench():
+    import lark_oapi as lark
+    from lark_oapi.api.docx.v1 import *
 from typing import List, Dict, Any, Optional
 from src.config import get_config
 
@@ -14,6 +17,8 @@ class FeishuDocManager:
     """飞书云文档管理器 (基于官方 SDK lark-oapi)"""
 
     def __init__(self):
+        from src.workbench import prohibit_outbound
+        prohibit_outbound()
         self.config = get_config()
         self.app_id = self.config.feishu_app_id
         self.app_secret = self.config.feishu_app_secret
@@ -38,6 +43,8 @@ class FeishuDocManager:
         """
         创建日报文档
         """
+        from src.workbench import prohibit_outbound
+        prohibit_outbound()
         if not self.client or not self.is_configured():
             logger.warning("飞书 SDK 未初始化或配置缺失，跳过创建")
             return None

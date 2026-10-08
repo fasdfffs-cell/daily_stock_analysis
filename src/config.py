@@ -876,6 +876,18 @@ def setup_env(override: bool = False):
                   Default is False to preserve behavior on initial load where
                   system environment variables take precedence.
     """
+    from src.workbench import is_manual_workbench
+    if is_manual_workbench():
+        # The launcher owns immutable safety/model settings. Only the isolated
+        # watchlist file is mutable; never load a user/home or repository .env.
+        env_path = os.environ.get("ENV_FILE")
+        if not env_path:
+            raise RuntimeError("Manual workbench requires an isolated ENV_FILE")
+        values = dotenv_values(env_path, interpolate=False)
+        if set(values) - {"STOCK_LIST"}:
+            raise RuntimeError("Manual workbench config only accepts STOCK_LIST")
+        os.environ["STOCK_LIST"] = values.get("STOCK_LIST") or ""
+        return
     Config._capture_bootstrap_runtime_env_overrides()
     # src/config.py -> src/ -> root
     env_file = os.getenv("ENV_FILE")

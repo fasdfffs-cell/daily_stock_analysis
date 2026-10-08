@@ -237,6 +237,18 @@ def _load_runtime_scheduler_args() -> dict:
 @asynccontextmanager
 async def app_lifespan(app: FastAPI):
     """Initialize and release shared services for the app lifecycle."""
+    from src.workbench import is_manual_workbench
+    if is_manual_workbench():
+        if not is_auth_enabled():
+            raise RuntimeError("Manual workbench requires authentication")
+        app.state.system_config_service = SystemConfigService()
+        try:
+            yield
+        finally:
+            from src.llm.openclaw_backend import cancel_all_model_runs
+            cancel_all_model_runs()
+            delattr(app.state, "system_config_service")
+        return
     runtime_owns_schedule = os.getenv(CLI_SCHEDULER_OWNER_ENV, "").strip().lower() not in {
         "1",
         "true",
@@ -359,8 +371,12 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     if extra_origins:
         allowed_origins.extend([o.strip() for o in extra_origins.split(",") if o.strip()])
     
+    from src.workbench import is_manual_workbench
+    if is_manual_workbench():
+        allowed_origins = [os.environ["PUBLIC_URL"].rstrip("/")]
+
     # 允许所有来源（开发/演示用）
-    allow_all_origins = os.environ.get("CORS_ALLOW_ALL", "").lower() == "true"
+    allow_all_origins = not is_manual_workbench() and os.environ.get("CORS_ALLOW_ALL", "").lower() == "true"
     allow_credentials = not allow_all_origins
     if allow_all_origins:
         _warn_if_open_cors_without_auth()
@@ -375,12 +391,26 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     )
 
     add_auth_middleware(app)
+    from api.middlewares.workbench import ManualWorkbenchMiddleware
+    app.add_middleware(ManualWorkbenchMiddleware)
     
     # ============================================================
     # 注册路由
     # ============================================================
     
     app.include_router(api_v1_router, prefix="/api/v1")
+    @app.get("/api/v1/workbench/status", include_in_schema=False)
+    async def manual_workbench_status():
+        from src.workbench import workbench_status
+        return workbench_status()
+
+    @app.post("/api/v1/workbench/cancel/{query_id}", include_in_schema=False)
+    async def cancel_workbench_model(query_id: str):
+        from src.workbench import is_manual_workbench
+        if not is_manual_workbench():
+            return JSONResponse({"error": "not_found"}, status_code=404)
+        from src.llm.openclaw_backend import cancel_model_run
+        return {"cancel_requested": cancel_model_run(query_id)}
     add_error_handlers(app)
     
     # ============================================================
@@ -480,7 +510,9 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     )
     async def serve_stock_index():
         """Serve the freshest available stock autocomplete index."""
-        _schedule_stock_index_background_refresh(app, "serve-stock-index")
+        from src.workbench import is_manual_workbench
+        if not is_manual_workbench():
+            _schedule_stock_index_background_refresh(app, "serve-stock-index")
 
         index_path = _find_existing_stock_index_path()
         if index_path is None:

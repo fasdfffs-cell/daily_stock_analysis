@@ -369,6 +369,18 @@ def trigger_analysis(
         HTTPException: 409 - 股票正在分析中
         HTTPException: 500 - 分析失败
     """
+    from src.workbench import is_manual_workbench
+    if is_manual_workbench():
+        if request.notify:
+            raise api_error(403, "workbench_restricted", "手动工作台禁止通知")
+        tokens = ([request.stock_code] if request.stock_code else []) + (request.stock_codes or [])
+        if len(tokens) != 1:
+            raise api_error(400, "workbench_restricted", "手动工作台一次只分析一只股票")
+        # Direct Yahoo symbols only: no remote name-resolution or broker/index
+        # paths. Global symbol support can be expanded after separate proof.
+        if not re.fullmatch(r"[A-Za-z]{1,5}(?:[.-][A-Za-z]{1,2})?", tokens[0].strip()):
+            raise api_error(400, "workbench_restricted", "本预览仅支持 Yahoo 美股代码（例如 NVDA）")
+        request.notify = False
     # 校验请求参数
     stock_codes = []
     if request.stock_code:

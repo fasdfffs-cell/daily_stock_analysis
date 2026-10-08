@@ -275,6 +275,10 @@ class StockAnalysisPipeline:
             else bool(daily_market_context_enabled)
         )
         self.daily_market_context_allow_generate = daily_market_context_allow_generate
+        from src.workbench import is_manual_workbench
+        if is_manual_workbench():
+            self.daily_market_context_enabled = False
+            self.daily_market_context_allow_generate = False
         
         # 初始化各模块
         self.db = get_db()
@@ -3781,7 +3785,11 @@ class StockAnalysisPipeline:
     @staticmethod
     def _report_output_dir() -> Path:
         """Default report output directory (kept same as NotificationService behavior)."""
-        return Path(__file__).resolve().parents[2] / 'reports'
+        from src.workbench import is_manual_workbench
+        if is_manual_workbench():
+            import os
+            return Path(os.environ["WORKBENCH_STATE_DIR"]) / "reports"
+        return Path(__file__).resolve().parents[2] / "reports"
 
     @classmethod
     def _fallback_save_report_to_file(

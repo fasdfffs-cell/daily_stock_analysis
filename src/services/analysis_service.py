@@ -111,6 +111,9 @@ class AnalysisService:
         """
         try:
             self.last_error = None
+            from src.workbench import is_manual_workbench
+            if is_manual_workbench():
+                send_notification = False
             # 导入分析相关模块
             from src.config import get_config
             from src.core.pipeline import StockAnalysisPipeline

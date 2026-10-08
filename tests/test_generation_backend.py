@@ -193,8 +193,12 @@ def test_generation_backend_factory_dispatches_litellm_and_local_cli_backends() 
             backend_id,
             config=_config(generation_backend=backend_id),
         )
-        assert isinstance(local_backend, LocalCliGenerationBackend)
-        assert local_backend.preset_id == backend_id
+        if backend_id == "openclaw_cli":
+            from src.llm.openclaw_backend import OpenClawGenerationBackend
+            assert isinstance(local_backend, OpenClawGenerationBackend)
+        else:
+            assert isinstance(local_backend, LocalCliGenerationBackend)
+            assert local_backend.preset_id == backend_id
 
 
 def test_resolvers_default_to_litellm_and_self_fallback_is_noop() -> None:
@@ -259,6 +263,7 @@ def test_unknown_generation_backend_raises_structured_config_error() -> None:
         "claude_code_cli",
         "codex_cli",
         "litellm",
+        "openclaw_cli",
         "opencode_cli",
     ]
 
@@ -315,6 +320,7 @@ def test_unknown_agent_backend_raises_structured_config_error() -> None:
         "claude_code_cli",
         "codex_cli",
         "litellm",
+        "openclaw_cli",
         "opencode_cli",
     ]
 

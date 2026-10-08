@@ -13,6 +13,7 @@ import type {
 } from '../types/analysis';
 import type { RunFlowSnapshot } from '../types/runFlow';
 import { serializeMarketReviewRegions } from '../utils/marketReviewRegion';
+import { MANUAL_WORKBENCH } from '../utils/workbench';
 
 // ============ API Interfaces ============
 
@@ -35,7 +36,7 @@ export const analysisApi = {
       selection_source: data.selectionSource,
       skills: data.skills,
       report_language: data.reportLanguage,
-      ...(data.notify !== undefined && { notify: data.notify }),
+      ...(MANUAL_WORKBENCH ? { notify: false } : data.notify !== undefined && { notify: data.notify }),
     };
 
     const response = await apiClient.post<Record<string, unknown>>(
@@ -71,7 +72,7 @@ export const analysisApi = {
       selection_source: data.selectionSource,
       skills: data.skills,
       report_language: data.reportLanguage,
-      ...(data.notify !== undefined && { notify: data.notify }),
+      ...(MANUAL_WORKBENCH ? { notify: false } : data.notify !== undefined && { notify: data.notify }),
     };
 
     const response = await apiClient.post<Record<string, unknown>>(

@@ -1,4 +1,5 @@
 import type React from 'react';
+import { MANUAL_WORKBENCH } from '../utils/workbench';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Check, SlidersHorizontal, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -453,6 +454,7 @@ const HomePage: React.FC = () => {
 
   useEffect(() => {
     let active = true;
+    if (MANUAL_WORKBENCH) return;
     systemConfigApi.getSetupStatus()
       .then((status) => {
         if (active) {
@@ -895,7 +897,7 @@ const HomePage: React.FC = () => {
     const stockName = typeof state?.stockName === 'string' ? state.stockName.trim() : '';
     setQuery(stockCode);
     navigate(location.pathname, { replace: true, state: null });
-    if (state?.autoAnalyze) {
+    if (state?.autoAnalyze && !MANUAL_WORKBENCH) {
       handleSubmitAnalysis(stockCode, stockName || undefined, 'import', state.skills);
     }
   }, [handleSubmitAnalysis, location.pathname, location.state, navigate, setQuery]);
@@ -1600,14 +1602,14 @@ const HomePage: React.FC = () => {
             <div className="flex min-w-0 flex-wrap items-center gap-2.5">
               <MarketReviewRegionSelector
                 value={marketReviewRegionOverride}
-                disabled={isSubmittingMarketReview}
+                disabled={MANUAL_WORKBENCH || isSubmittingMarketReview}
                 onChange={setMarketReviewRegionOverride}
               />
               <label className="flex h-10 flex-shrink-0 cursor-pointer items-center gap-1.5 rounded-xl border border-subtle bg-surface/60 px-3 text-xs text-secondary-text select-none transition-colors hover:border-subtle-hover hover:text-foreground has-disabled:cursor-not-allowed has-disabled:opacity-50">
                 <input
                   type="checkbox"
-                  checked={notify}
-                  disabled={isSubmittingMarketReview}
+                  checked={!MANUAL_WORKBENCH && notify}
+                  disabled={MANUAL_WORKBENCH || isSubmittingMarketReview}
                   onChange={(e) => setNotify(e.target.checked)}
                   className="h-3.5 w-3.5 rounded border-border accent-primary"
                 />
@@ -1619,6 +1621,7 @@ const HomePage: React.FC = () => {
                 size="md"
                 isLoading={isSubmittingMarketReview}
                 loadingText={t('home.submitMarketReview')}
+                disabled={MANUAL_WORKBENCH}
                 onClick={() => void handleTriggerMarketReview()}
                 className="h-10 flex-1 whitespace-nowrap md:flex-none"
               >
@@ -1798,7 +1801,7 @@ const HomePage: React.FC = () => {
                     <Button
                       variant="home-action-ai"
                       size="sm"
-                      disabled={isSubmittingMarketReview}
+                      disabled={MANUAL_WORKBENCH || isSubmittingMarketReview}
                       isLoading={isSubmittingMarketReview}
                       loadingText={t('home.submitMarketReview')}
                       onClick={() => void handleTriggerMarketReview()}
