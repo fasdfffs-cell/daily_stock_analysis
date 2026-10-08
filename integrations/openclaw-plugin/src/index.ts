@@ -1,7 +1,7 @@
 import { defineToolPlugin } from "openclaw/plugin-sdk/tool-plugin";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { withDsaRouteAccess } from "./access.js";
-import { configSchema, parseConfig } from "./config.js";
+import { configSchema, parseConfig, resolveRegistrationConfig } from "./config.js";
 import { createDsaHttpHandler } from "./http.js";
 import { ROUTE_ROOT } from "./policy.js";
 
@@ -33,7 +33,7 @@ entry.register = (api) => {
     const input = api.pluginConfig ?? {};
     let config: ReturnType<typeof parseConfig> | undefined;
     if (entry.configSchema?.safeParse?.(input).success && (Object.hasOwn(input, "dbPath") || Object.hasOwn(input, "staticDir"))) {
-      try { config = parseConfig(input); } catch { /* Invalid setup stays inert, never local business. */ }
+      try { config = resolveRegistrationConfig(input, Object.hasOwn(input, "accessPolicySource") ? api.config : undefined); } catch { /* Invalid setup stays inert, never local business. */ }
     }
     if (!config) api.logger.warn("[dsa-workbench] Business routes unavailable: complete valid admin configuration is required.");
     registerDeclaredTools(api);

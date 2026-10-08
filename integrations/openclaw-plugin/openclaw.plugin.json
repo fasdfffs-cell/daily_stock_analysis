@@ -31,6 +31,49 @@
             "staticDir"
           ]
         }
+      },
+      {
+        "if": {
+          "required": [
+            "accessPolicySource"
+          ]
+        },
+        "then": {
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "tailscaleBin"
+                ]
+              },
+              {
+                "required": [
+                  "tailscaleLogin"
+                ]
+              },
+              {
+                "required": [
+                  "cloudflareAccessHost"
+                ]
+              },
+              {
+                "required": [
+                  "cloudflareAccessIssuer"
+                ]
+              },
+              {
+                "required": [
+                  "cloudflareAccessAudience"
+                ]
+              },
+              {
+                "required": [
+                  "cloudflareAccessEmail"
+                ]
+              }
+            ]
+          }
+        }
       }
     ],
     "properties": {
@@ -45,33 +88,34 @@
         "pattern": "^/[^\\u0000]*$"
       },
       "tailscaleBin": {
-        "type": "string",
-        "default": "/usr/bin/tailscale"
+        "type": "string"
       },
       "tailscaleLogin": {
         "type": "string",
-        "default": "",
         "maxLength": 320
       },
       "cloudflareAccessHost": {
         "type": "string",
-        "default": "",
         "maxLength": 253
       },
       "cloudflareAccessIssuer": {
         "type": "string",
-        "default": "",
         "maxLength": 512
       },
       "cloudflareAccessAudience": {
         "type": "string",
-        "default": "",
         "maxLength": 2048
       },
       "cloudflareAccessEmail": {
         "type": "string",
-        "default": "",
         "maxLength": 320
+      },
+      "accessPolicySource": {
+        "type": "string",
+        "enum": [
+          "todo",
+          "parking-trends"
+        ]
       }
     }
   },
@@ -109,6 +153,10 @@
       "label": "cloudflareAccessEmail",
       "help": "Existing private ingress identity; do not auto-populate or relax.",
       "sensitive": true
+    },
+    "accessPolicySource": {
+      "label": "Existing identity policy source",
+      "help": "Explicit admin opt-in: todo or parking-trends. Projects only six identity fields from an enabled runtime snapshot source; invalid/conflicting source stays inert."
     }
   },
   "contracts": {

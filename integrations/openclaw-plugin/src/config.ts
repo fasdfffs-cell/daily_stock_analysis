@@ -20,18 +20,23 @@ const DEFAULTS: DsaConfig = {
 // Ordinary JSON Schema is accepted by the public SDK. Keep authoring metadata
 // and runtime parsing on the same strict field set; no location-relative defaults.
 // Empty first installation is inert; either path requires both absolute paths.
+const ACCESS_FIELDS = ["tailscaleBin", "tailscaleLogin", "cloudflareAccessHost", "cloudflareAccessIssuer", "cloudflareAccessAudience", "cloudflareAccessEmail"] as const;
 export const configSchema = {
   type: "object", additionalProperties: false,
-  allOf: [{ if: { anyOf: [{ required: ["dbPath"] }, { required: ["staticDir"] }] }, then: { required: ["dbPath", "staticDir"] } }],
+  allOf: [
+    { if: { anyOf: [{ required: ["dbPath"] }, { required: ["staticDir"] }] }, then: { required: ["dbPath", "staticDir"] } },
+    { if: { required: ["accessPolicySource"] }, then: { not: { anyOf: ACCESS_FIELDS.map(key => ({ required: [key] })) } } },
+  ],
   properties: {
     dbPath: { type: "string", minLength: 1, pattern: "^/[^\\u0000]*$" },
     staticDir: { type: "string", minLength: 1, pattern: "^/[^\\u0000]*$" },
-    tailscaleBin: { type: "string", default: "/usr/bin/tailscale" },
-    tailscaleLogin: { type: "string", default: "", maxLength: 320 },
-    cloudflareAccessHost: { type: "string", default: "", maxLength: 253 },
-    cloudflareAccessIssuer: { type: "string", default: "", maxLength: 512 },
-    cloudflareAccessAudience: { type: "string", default: "", maxLength: 2048 },
-    cloudflareAccessEmail: { type: "string", default: "", maxLength: 320 },
+    tailscaleBin: { type: "string" },
+    tailscaleLogin: { type: "string", maxLength: 320 },
+    cloudflareAccessHost: { type: "string", maxLength: 253 },
+    cloudflareAccessIssuer: { type: "string", maxLength: 512 },
+    cloudflareAccessAudience: { type: "string", maxLength: 2048 },
+    cloudflareAccessEmail: { type: "string", maxLength: 320 },
+    accessPolicySource: { type: "string", enum: ["todo", "parking-trends"] },
   },
 };
 export function parseConfig(input: Record<string, unknown> = {}): DsaConfig {
@@ -58,4 +63,27 @@ export function parseConfig(input: Record<string, unknown> = {}): DsaConfig {
   }
   if (Buffer.byteLength(result.tailscaleLogin) > 320 || /[\r\n\0]/.test(result.tailscaleLogin)) throw new Error("Invalid Tailscale identity");
   return result;
+}
+
+/** Public api.config snapshot shape; no credentials, files or arbitrary source lookup. */
+type PolicySnapshot = { plugins?: { entries?: Record<string, { enabled?: boolean; config?: unknown } | undefined> } };
+/** Explicit admin opt-in only. The functional eight-field parser stays unchanged. */
+export function resolveRegistrationConfig(input: Record<string, unknown>, snapshot?: PolicySnapshot): DsaConfig {
+  if (!Object.hasOwn(input, "accessPolicySource")) return parseConfig(input);
+  const source = input.accessPolicySource;
+  if (source !== "todo" && source !== "parking-trends" || ACCESS_FIELDS.some(key => Object.hasOwn(input, key))) throw new Error("Invalid or conflicting access policy source");
+  // Validate both paths before consulting even the selected source snapshot.
+  parseConfig({ dbPath: input.dbPath, staticDir: input.staticDir });
+  const selected = snapshot?.plugins?.entries?.[source];
+  if (selected?.enabled !== true || !selected.config || typeof selected.config !== "object" || Array.isArray(selected.config)) throw new Error("Access policy source unavailable");
+  const metadata = selected.config as Record<string, unknown>;
+  const projected: Record<string, unknown> = { dbPath: input.dbPath, staticDir: input.staticDir };
+  for (const key of ACCESS_FIELDS) {
+    const value = metadata[key];
+    if (!Object.hasOwn(metadata, key) || typeof value !== "string" || /<redacted>|\[redacted\]|^\*{3,}$/i.test(value.trim())) throw new Error("Access policy source incomplete");
+    projected[key] = value;
+  }
+  const config = parseConfig(projected);
+  if (!config.tailscaleLogin && !(config.cloudflareAccessHost && config.cloudflareAccessIssuer && config.cloudflareAccessAudience)) throw new Error("Access policy source incomplete");
+  return config;
 }

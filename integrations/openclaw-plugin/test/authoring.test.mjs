@@ -20,10 +20,10 @@ const plugin = module.default;
 const { getToolPluginMetadata } = await import('openclaw/plugin-sdk/tool-plugin');
 const metadata = getToolPluginMetadata(plugin);
 const admin = { dbPath: resolve('fixture-do-not-create.db'), staticDir: resolve('app') };
-function registration(config = admin) {
+function registration(config = admin, runtimeConfig, messages = []) {
   const descriptors = [], routes = [];
   const unexpected = () => { throw new Error('No additional capabilities may be registered'); };
-  plugin.register({ id: 'dsa-workbench', pluginConfig: config, logger: { warn() {} },
+  plugin.register({ id: 'dsa-workbench', pluginConfig: config, config: runtimeConfig, logger: { warn(value) { messages.push(value); } },
     session: { controls: { registerControlUiDescriptor(value) { descriptors.push(value); } } },
     registerHttpRoute(value) { routes.push(value); }, registerTool: unexpected,
     registerSessionAction: unexpected, registerCommand: unexpected, registerService: unexpected,
@@ -36,7 +36,7 @@ test('public authoring factory retains strict complete metadata without invented
   assert.equal(metadata.id, 'dsa-workbench'); assert.deepEqual(metadata.tools, []);
   assert.equal(metadata.configSchema.additionalProperties, false);
   assert.equal(metadata.configSchema.required, undefined);
-  assert.deepEqual(Object.keys(metadata.configSchema.properties).sort(), ['dbPath', 'staticDir', 'tailscaleBin', 'tailscaleLogin', 'cloudflareAccessHost', 'cloudflareAccessIssuer', 'cloudflareAccessAudience', 'cloudflareAccessEmail'].sort());
+  assert.deepEqual(Object.keys(metadata.configSchema.properties).sort(), ['dbPath', 'staticDir', 'tailscaleBin', 'tailscaleLogin', 'cloudflareAccessHost', 'cloudflareAccessIssuer', 'cloudflareAccessAudience', 'cloudflareAccessEmail', 'accessPolicySource'].sort());
   const manifest = JSON.parse(readFileSync('openclaw.plugin.json', 'utf8'));
   assert.deepEqual(metadata.configSchema, manifest.configSchema);
   assert.deepEqual(manifest.contracts.tools, []); assert.equal(manifest.controlUi, undefined);
@@ -98,6 +98,45 @@ test('empty, incomplete and invalid initial configs stay guarded 503 with no loc
   } finally { for (const [object, key, original] of originals) object[key] = original; syncBuiltinESMExports(); globalThis.fetch = originalFetch; rmSync(root, { recursive: true }); }
 });
 
+test('explicit source schema has no auto-filled direct metadata and rejects every source conflict', () => {
+  for (const accessPolicySource of ['todo', 'parking-trends']) {
+    const input = { ...admin, accessPolicySource };
+    const parsed = plugin.configSchema.safeParse(input);
+    assert.equal(parsed.success, true); assert.deepEqual(parsed.data, input);
+    for (const key of ['tailscaleBin', 'tailscaleLogin', 'cloudflareAccessHost', 'cloudflareAccessIssuer', 'cloudflareAccessAudience', 'cloudflareAccessEmail']) assert.equal(plugin.configSchema.safeParse({ ...input, [key]: '' }).success, false, key);
+  }
+  assert.equal(plugin.configSchema.safeParse({ ...admin, accessPolicySource: '../arbitrary' }).success, false);
+  assert.equal(plugin.configSchema.safeParse({ accessPolicySource: 'todo' }).success, true);
+});
+
+test('absent disabled redacted incomplete and invalid source metadata stays inert without exposure or acquisition', async () => {
+  const fields = { tailscaleBin: '/usr/bin/tailscale', tailscaleLogin: '', cloudflareAccessHost: 'source.example.invalid', cloudflareAccessIssuer: 'https://source-fixture.cloudflareaccess.com', cloudflareAccessAudience: 'private-fixture-aud', cloudflareAccessEmail: '' };
+  const entry = config => ({ plugins: { entries: { todo: { enabled: true, config } } } });
+  const missing = { ...fields }; delete missing.cloudflareAccessAudience;
+  const snapshots = [undefined, {}, { plugins: { entries: {} } }, { plugins: { entries: { todo: { enabled: false, config: fields } } } }, entry(missing), entry({ ...fields, cloudflareAccessAudience: '<redacted>' }), entry({ ...fields, cloudflareAccessAudience: 'x'.repeat(2049) }), entry({ ...fields, cloudflareAccessAudience: 42 }), entry({ ...fields, cloudflareAccessAudience: '' }), entry({ ...fields, tailscaleBin: 'relative' }), entry({ ...fields, tailscaleLogin: 'fixture@example.invalid', cloudflareAccessAudience: '' }), entry({ ...fields, cloudflareAccessHost: '', cloudflareAccessIssuer: '', cloudflareAccessAudience: '' }), ...Object.keys(fields).map(key => entry({ ...fields, [key]: '<redacted>' }))];
+  const oldFetch = globalThis.fetch; const oldAgent = http.Agent; let effects = 0;
+  const blocked = function () { effects++; throw new Error('Invalid source may not acquire or initialize proxy'); };
+  http.Agent = blocked; syncBuiltinESMExports(); globalThis.fetch = blocked;
+  try {
+    for (const snapshot of snapshots) {
+      const messages = []; const { routes, descriptors } = registration({ ...admin, accessPolicySource: 'todo' }, snapshot, messages);
+      const server = createServer(routes[0].handler);
+      try {
+        await new Promise(done => server.listen(0, '127.0.0.1', done));
+        const result = await nativeRequest({ port: server.address().port, path: '/plugins/dsa-workbench/app/api/v1/auth/status' });
+        assert.equal(result.status, 503); assert.equal(JSON.parse(result.text).error, 'dsa_workbench_not_configured');
+        assert.doesNotMatch(result.text + JSON.stringify(messages) + JSON.stringify(descriptors), /private-fixture-aud|source\.example|source-fixture|<redacted>/);
+        assert.equal(effects, 0);
+      } finally { server.closeAllConnections(); await new Promise(done => server.close(done)); }
+    }
+    const noRead = { get plugins() { throw new Error('Paths/selector must precede snapshot read'); } };
+    assert.doesNotThrow(() => registration({}, noRead));
+    assert.doesNotThrow(() => registration({ accessPolicySource: 'todo' }, noRead));
+    assert.doesNotThrow(() => registration({ ...admin, accessPolicySource: 'todo', tailscaleLogin: 'conflict' }, noRead));
+    assert.doesNotThrow(() => registration({ ...admin, accessPolicySource: 'unknown' }, noRead));
+  } finally { http.Agent = oldAgent; syncBuiltinESMExports(); globalThis.fetch = oldFetch; }
+});
+
 test('single-backend embedded catalog preserves every original app resource byte', () => {
   const files = [];
   function walk(directory, prefix = '') {
@@ -153,6 +192,32 @@ test('registered entry retains escaped readonly reports, exact CSS and full RS25
     for (const extra of [{ email: '' }, { email: null }, { iss: 'https://wrong.cloudflareaccess.com' }, { aud: 'wrong' }, { exp: 1 }, { nbf: Math.floor(Date.now() / 1000) + 600 }]) assert.equal((await call(paths[0], { headers: { ...headers, 'cf-access-jwt-assertion': token(extra) } })).status, 401);
     assert.equal((await call(paths[0], { headers: { ...headers, 'cf-access-jwt-assertion': token().slice(0, -12) + 'invalidbytes' } })).status, 401);
     for (const spoof of [{ host: 'untrusted.invalid' }, { host: '127.0.0.1', 'x-forwarded-for': '203.0.113.1' }]) assert.equal((await call(paths[0], { headers: spoof })).status, 401);
+    for (const source of ['todo', 'parking-trends']) {
+      const readFields = [], messages = [];
+      const values = { tailscaleBin: '/usr/bin/tailscale', tailscaleLogin: '', cloudflareAccessHost: host, cloudflareAccessIssuer: issuer, cloudflareAccessAudience: 'artifact-fixture', cloudflareAccessEmail: source === 'parking-trends' ? 'owner@example.invalid' : '' };
+      const projectedSource = {};
+      for (const [key, value] of Object.entries(values)) Object.defineProperty(projectedSource, key, { enumerable: true, get() { readFields.push(key); return value; } });
+      for (const key of ['dbPath', 'staticDir', 'password', 'provider', 'secret']) Object.defineProperty(projectedSource, key, { enumerable: true, get() { throw new Error('Only six policy metadata fields may be read'); } });
+      const entries = { [source]: { enabled: true, config: projectedSource } };
+      Object.defineProperty(entries, source === 'todo' ? 'parking-trends' : 'todo', { get() { throw new Error('Unselected source may not be read'); } });
+      const snapshot = { plugins: { entries }, get models() { throw new Error('Provider configuration may not be read'); } };
+      const inherited = registration({ dbPath, staticDir: resolve('app'), accessPolicySource: source }, snapshot, messages);
+      assert.deepEqual(readFields.sort(), Object.keys(values).sort());
+      const sourced = createServer(inherited.routes[0].handler);
+      try {
+        await new Promise(done => sourced.listen(0, '127.0.0.1', done)); const sourcePort = sourced.address().port;
+        for (const path of paths) assert.equal((await nativeRequest({ port: sourcePort, path, headers })).status, 401);
+        for (const path of paths.slice(0, 4)) {
+          const response = await nativeRequest({ port: sourcePort, path, headers: authenticated });
+          assert.equal(response.status, 200); assert.doesNotMatch(response.text, /artifact-fixture|owner@example\.invalid/);
+        }
+        assert.equal((await nativeRequest({ port: sourcePort, path: paths[4], headers: authenticated })).status, 403);
+        if (source === 'parking-trends') assert.equal((await nativeRequest({ port: sourcePort, path: paths[0], headers: { ...headers, 'cf-access-jwt-assertion': token({ email: 'different@example.invalid' }) } })).status, 401);
+        for (const extra of [{ email: '' }, { email: null }, { email: 'x'.repeat(321) }, { iss: 'https://wrong.cloudflareaccess.com' }, { aud: 'wrong' }, { exp: 1 }, { nbf: Math.floor(Date.now() / 1000) + 600 }]) assert.equal((await nativeRequest({ port: sourcePort, path: paths[0], headers: { ...headers, 'cf-access-jwt-assertion': token(extra) } })).status, 401);
+        assert.equal((await nativeRequest({ port: sourcePort, path: paths[0], headers: { ...headers, 'cf-access-jwt-assertion': token().slice(0, -12) + 'invalidbytes' } })).status, 401);
+        assert.doesNotMatch(JSON.stringify(messages) + JSON.stringify(inherited.descriptors), /artifact-fixture|owner@example\.invalid/);
+      } finally { sourced.closeAllConnections(); await new Promise(done => sourced.close(done)); }
+    }
     // A complete valid identity does not make missing business paths usable.
     const partial = { ...config }; delete partial.staticDir;
     const inactive = createServer(registration(partial).routes[0].handler);
