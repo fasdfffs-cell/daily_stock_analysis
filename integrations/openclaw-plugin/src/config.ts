@@ -1,5 +1,4 @@
 import { isAbsolute, resolve } from "node:path";
-import type { DsaRouteAccessConfig } from "./access.js";
 
 export interface DsaConfig {
   dbPath: string;
@@ -20,13 +19,13 @@ const DEFAULTS: DsaConfig = {
 };
 // Ordinary JSON Schema is accepted by the public SDK. Keep authoring metadata
 // and runtime parsing on the same strict field set; no location-relative defaults.
-// First installation may be empty. Business readiness, not installation, requires
-// both admin paths and one complete configured ingress identity.
+// Empty first installation is inert; either path requires both absolute paths.
 export const configSchema = {
   type: "object", additionalProperties: false,
+  allOf: [{ if: { anyOf: [{ required: ["dbPath"] }, { required: ["staticDir"] }] }, then: { required: ["dbPath", "staticDir"] } }],
   properties: {
-    dbPath: { type: "string", minLength: 1 },
-    staticDir: { type: "string", minLength: 1 },
+    dbPath: { type: "string", minLength: 1, pattern: "^/[^\\u0000]*$" },
+    staticDir: { type: "string", minLength: 1, pattern: "^/[^\\u0000]*$" },
     tailscaleBin: { type: "string", default: "/usr/bin/tailscale" },
     tailscaleLogin: { type: "string", default: "", maxLength: 320 },
     cloudflareAccessHost: { type: "string", default: "", maxLength: 253 },
@@ -35,7 +34,7 @@ export const configSchema = {
     cloudflareAccessEmail: { type: "string", default: "", maxLength: 320 },
   },
 };
-function normalizeConfig(input: Record<string, unknown>, allowMissingPaths: boolean): DsaConfig {
+export function parseConfig(input: Record<string, unknown> = {}): DsaConfig {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Plugin config must be an object");
   if (Object.keys(input).some(key => !Object.hasOwn(DEFAULTS, key))) throw new Error("Unknown plugin configuration key");
   const result = { ...DEFAULTS };
@@ -46,7 +45,6 @@ function normalizeConfig(input: Record<string, unknown>, allowMissingPaths: bool
     }
   }
   for (const key of ["dbPath", "staticDir", "tailscaleBin"] as const) {
-    if (allowMissingPaths && key !== "tailscaleBin" && !result[key]) continue;
     if (!isAbsolute(result[key]) || result[key].includes("\0")) throw new Error(`${key} must be an explicit absolute admin path`);
     result[key] = resolve(result[key]);
   }
@@ -60,25 +58,4 @@ function normalizeConfig(input: Record<string, unknown>, allowMissingPaths: bool
   }
   if (Buffer.byteLength(result.tailscaleLogin) > 320 || /[\r\n\0]/.test(result.tailscaleLogin)) throw new Error("Invalid Tailscale identity");
   return result;
-}
-/** Usable business configuration keeps the original mandatory-path checks. */
-export function parseConfig(input: Record<string, unknown> = {}): DsaConfig {
-  return normalizeConfig(input, false);
-}
-export type DsaRegistrationState =
-  | { ready: true; config: DsaConfig; access: DsaRouteAccessConfig }
-  | { ready: false; access: DsaRouteAccessConfig };
-/** Empty/partial installation is inert, never an implicit localhost business mode. */
-export function registrationState(input: Record<string, unknown> = {}): DsaRegistrationState {
-  try {
-    const candidate = normalizeConfig(input, true);
-    const identityReady = Boolean(candidate.tailscaleLogin || candidate.cloudflareAccessHost && candidate.cloudflareAccessIssuer && candidate.cloudflareAccessAudience);
-    if (!candidate.dbPath || !candidate.staticDir || !identityReady) return { ready: false, access: candidate };
-    const config = parseConfig(input);
-    return { ready: true, config, access: config };
-  } catch {
-    // Invalid admin input cannot crash first load or leave a prior weaker handler.
-    // Do not expose values or trust any part of an invalid identity configuration.
-    return { ready: false, access: { ...DEFAULTS } };
-  }
 }

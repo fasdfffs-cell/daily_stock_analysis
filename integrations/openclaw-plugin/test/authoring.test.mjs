@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { register } from 'node:module';
+import { register, syncBuiltinESMExports } from 'node:module';
+import http from 'node:http';
+import sqlite from 'node:sqlite';
+import fs from 'node:fs';
+import childProcess from 'node:child_process';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -47,7 +51,8 @@ test('actual host SDK composition registers only the original descriptor and gua
 
 test('strict optional installation schema accepts empty config without weakening business parser', () => {
   assert.equal(plugin.configSchema.safeParse(admin).success, true);
-  for (const value of [{}, { dbPath: admin.dbPath }]) assert.equal(plugin.configSchema.safeParse(value).success, true);
+  assert.equal(plugin.configSchema.safeParse({}).success, true);
+  for (const value of [{ dbPath: admin.dbPath }, { staticDir: admin.staticDir }, { ...admin, dbPath: 'relative.db' }, { ...admin, staticDir: 'relative' }, { ...admin, dbPath: '/bad\0path' }]) assert.equal(plugin.configSchema.safeParse(value).success, false);
   for (const value of [{ ...admin, extra: true }, { ...admin, staticDir: 1 }, { ...admin, dbPath: '' }]) assert.equal(plugin.configSchema.safeParse(value).success, false);
   for (const value of [{}, { dbPath: admin.dbPath }, { ...admin, staticDir: 'relative' }, { ...admin, dbPath: 'relative.db' }, { ...admin, extra: 'not-allowed' }, { ...admin, cloudflareAccessHost: 'dsa.example.invalid' }, { ...admin, cloudflareAccessEmail: 'owner@example.invalid' }]) assert.doesNotThrow(() => registration(value));
   registration({ ...admin, cloudflareAccessHost: 'dsa.example.invalid', cloudflareAccessIssuer: 'https://fixture.cloudflareaccess.com', cloudflareAccessAudience: 'fixture' });
@@ -56,9 +61,14 @@ test('strict optional installation schema accepts empty config without weakening
 test('empty, incomplete and invalid initial configs stay guarded 503 with no local business or acquisition', async () => {
   const root = mkdtempSync(join(tmpdir(), 'dsa-inert-'));
   const missingDatabase = join(root, 'must-not-create.db');
-  const values = [undefined, {}, { dbPath: missingDatabase }, { dbPath: missingDatabase, staticDir: '/must-not-read-static' }, { ...admin, staticDir: 'relative' }, { ...admin, cloudflareAccessHost: 'dsa.example.invalid' }, { ...admin, cloudflareAccessEmail: 'owner@example.invalid' }, { ...admin, extra: 'do-not-trust' }];
+  const values = [undefined, {}, { dbPath: missingDatabase }, { staticDir: '/must-not-read-static' }, { cloudflareAccessHost: 'dsa.example.invalid', cloudflareAccessIssuer: 'https://fixture.cloudflareaccess.com', cloudflareAccessAudience: 'fixture' }, { tailscaleLogin: 'fixture@example.invalid' }, { ...admin, staticDir: 'relative' }, { ...admin, cloudflareAccessHost: 'dsa.example.invalid' }, { ...admin, cloudflareAccessEmail: 'owner@example.invalid' }, { ...admin, extra: 'do-not-trust' }];
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = () => { throw new Error('Inactive plugin must not fetch or initialize a client'); };
+  const originals = [[http, 'Agent'], [http, 'request'], [sqlite, 'DatabaseSync'], [fs, 'lstatSync'], [fs, 'openSync'], [childProcess, 'execFile']].map(([object, key]) => [object, key, object[key]]);
+  let sideEffects = 0;
+  const blocked = function () { sideEffects++; throw new Error('Inactive plugin must not initialize DB/agent/filesystem/network/WhoIs'); };
+  for (const [object, key] of originals) object[key] = blocked;
+  syncBuiltinESMExports();
+  globalThis.fetch = blocked;
   try {
     for (const value of values) {
       const { routes } = registration(value === undefined ? {} : value);
@@ -70,14 +80,22 @@ test('empty, incomplete and invalid initial configs stay guarded 503 with no loc
           assert.equal(result.status, 503); assert.equal(JSON.parse(result.text).error, 'dsa_workbench_not_configured');
           assert.doesNotMatch(result.text, /NVDA|saved-report|must-not-read-static|fixture-do-not-create|<script|<form/);
         }
-        assert.equal((await nativeRequest({ port, path: '/plugins/dsa-workbench/', method: 'HEAD' })).status, 503);
+        const head = await nativeRequest({ port, path: '/plugins/dsa-workbench/', method: 'HEAD' });
+        assert.equal(head.status, 503); assert.equal(head.text, '');
+        for (const method of ['POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) {
+          const denied = await nativeRequest({ port, path: '/plugins/dsa-workbench/app/api/v1/analysis/analyze?echo=private-canary', method, headers: { origin: 'https://untrusted.invalid', cookie: 'canary=private-canary' } });
+          assert.equal(denied.status, 503); assert.deepEqual(JSON.parse(denied.text), { error: 'dsa_workbench_not_configured', message: 'DSA Workbench is not configured; all business access is disabled.' });
+          for (const name of ['set-cookie', 'access-control-allow-origin', 'access-control-allow-credentials', 'location']) assert.equal(denied.headers[name], undefined);
+          assert.equal(denied.headers['cache-control'], 'no-store'); assert.doesNotMatch(denied.text, /private-canary/);
+        }
         const write = await nativeRequest({ port, path: '/plugins/dsa-workbench/app/api/v1/auth/login', method: 'POST', body: '{"password":"fixture-only"}' });
         assert.equal(write.status, 503); assert.equal(write.headers['set-cookie'], undefined);
-        for (const headers of [{ host: 'unknown.invalid' }, { host: '127.0.0.1', 'x-forwarded-for': '203.0.113.1' }, { host: 'dsa.example.invalid', 'x-forwarded-proto': 'https', 'cf-access-jwt-assertion': 'not-a-real-token' }]) assert.equal((await nativeRequest({ port, path: '/plugins/dsa-workbench/', headers })).status, 401);
+        for (const headers of [{ host: 'unknown.invalid' }, { host: '127.0.0.1', 'x-forwarded-for': '203.0.113.1' }, { host: 'dsa.example.invalid', 'x-forwarded-proto': 'https', 'cf-access-jwt-assertion': 'not-a-real-token' }]) assert.equal((await nativeRequest({ port, path: '/plugins/dsa-workbench/', headers })).status, 503);
         assert.equal(existsSync(missingDatabase), false);
+        assert.equal(sideEffects, 0);
       } finally { server.closeAllConnections(); await new Promise(done => server.close(done)); }
     }
-  } finally { globalThis.fetch = originalFetch; rmSync(root, { recursive: true }); }
+  } finally { for (const [object, key, original] of originals) object[key] = original; syncBuiltinESMExports(); globalThis.fetch = originalFetch; rmSync(root, { recursive: true }); }
 });
 
 test('single-backend embedded catalog preserves every original app resource byte', () => {
@@ -141,12 +159,21 @@ test('registered entry retains escaped readonly reports, exact CSS and full RS25
     try {
       await new Promise(done => inactive.listen(0, '127.0.0.1', done));
       const inactivePort = inactive.address().port;
-      assert.equal((await nativeRequest({ port: inactivePort, path: paths[0], headers })).status, 401);
+      assert.equal((await nativeRequest({ port: inactivePort, path: paths[0], headers })).status, 503);
       for (const path of paths) {
         const result = await nativeRequest({ port: inactivePort, path, headers: authenticated });
         assert.equal(result.status, 503); assert.equal(JSON.parse(result.text).error, 'dsa_workbench_not_configured');
       }
     } finally { inactive.closeAllConnections(); await new Promise(done => inactive.close(done)); }
+    // Complete paths without remote identity preserve the existing local-trust policy.
+    const local = createServer(registration({ dbPath, staticDir: resolve('app') }).routes[0].handler);
+    try {
+      await new Promise(done => local.listen(0, '127.0.0.1', done));
+      const localPort = local.address().port;
+      assert.equal((await nativeRequest({ port: localPort, path: paths[0] })).status, 200);
+      assert.equal((await nativeRequest({ port: localPort, path: paths[1] })).status, 200);
+      assert.equal((await nativeRequest({ port: localPort, path: paths[0], headers: { host: 'untrusted.invalid' } })).status, 401);
+    } finally { local.closeAllConnections(); await new Promise(done => local.close(done)); }
     assert.deepEqual(readFileSync(dbPath), before);
   } finally {
     globalThis.fetch = originalFetch; server.closeAllConnections();

@@ -9,14 +9,40 @@
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
+    "allOf": [
+      {
+        "if": {
+          "anyOf": [
+            {
+              "required": [
+                "dbPath"
+              ]
+            },
+            {
+              "required": [
+                "staticDir"
+              ]
+            }
+          ]
+        },
+        "then": {
+          "required": [
+            "dbPath",
+            "staticDir"
+          ]
+        }
+      }
+    ],
     "properties": {
       "dbPath": {
         "type": "string",
-        "minLength": 1
+        "minLength": 1,
+        "pattern": "^/[^\\u0000]*$"
       },
       "staticDir": {
         "type": "string",
-        "minLength": 1
+        "minLength": 1,
+        "pattern": "^/[^\\u0000]*$"
       },
       "tailscaleBin": {
         "type": "string",

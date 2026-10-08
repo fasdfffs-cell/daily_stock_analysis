@@ -1,7 +1,7 @@
 import { defineToolPlugin } from "openclaw/plugin-sdk/tool-plugin";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { withDsaRouteAccess } from "./access.js";
-import { configSchema, registrationState } from "./config.js";
+import { configSchema, parseConfig } from "./config.js";
 import { createDsaHttpHandler } from "./http.js";
 import { ROUTE_ROOT } from "./policy.js";
 
@@ -15,20 +15,27 @@ const entry = defineToolPlugin({
   tools: () => [],
 });
 const registerDeclaredTools = entry.register;
+const UNCONFIGURED_BODY = Buffer.from(JSON.stringify({ error: "dsa_workbench_not_configured", message: "DSA Workbench is not configured; all business access is disabled." }));
 function unavailable(req: IncomingMessage, res: ServerResponse): boolean {
-  const body = Buffer.from(JSON.stringify({ error: "dsa_workbench_not_configured", message: "Complete valid admin paths and ingress identity are required; all DSA business access is disabled." }));
+  const body = UNCONFIGURED_BODY;
   res.statusCode = 503;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.setHeader("Content-Length", body.length);
   res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Content-Security-Policy", "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'");
   res.end(req.method === "HEAD" ? undefined : body);
   return true;
 }
 entry.register = (api) => {
-    const state = registrationState(api.pluginConfig);
-    if (!state.ready) api.logger.warn("[dsa-workbench] Business routes unavailable: complete valid admin configuration is required.");
+    const input = api.pluginConfig ?? {};
+    let config: ReturnType<typeof parseConfig> | undefined;
+    if (entry.configSchema?.safeParse?.(input).success && (Object.hasOwn(input, "dbPath") || Object.hasOwn(input, "staticDir"))) {
+      try { config = parseConfig(input); } catch { /* Invalid setup stays inert, never local business. */ }
+    }
+    if (!config) api.logger.warn("[dsa-workbench] Business routes unavailable: complete valid admin configuration is required.");
     registerDeclaredTools(api);
     api.session.controls.registerControlUiDescriptor({
       surface: "tab", id: "dsa-workbench", label: "股票研究",
@@ -37,8 +44,9 @@ entry.register = (api) => {
     });
     api.registerHttpRoute({
       path: `${ROUTE_ROOT}/`, match: "prefix", auth: "plugin",
-      // The inactive branch never constructs ReportData or the upstream proxy.
-      handler: withDsaRouteAccess(state.ready ? createDsaHttpHandler(state.config) : unavailable, { ...state.access, logger: api.logger }),
+      // No identity/network/DB/proxy initialization in the fixed inactive branch.
+      // Complete config preserves the original guard, including its local-trust policy.
+      handler: config ? withDsaRouteAccess(createDsaHttpHandler(config), { ...config, logger: api.logger }) : unavailable,
     });
 };
 
