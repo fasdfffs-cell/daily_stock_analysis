@@ -98,3 +98,6 @@ docs/specs/
 /integrations/openclaw-plugin/app/
 /integrations/openclaw-plugin/.tsconfig.host.json
 /integrations/openclaw-plugin/*.tgz
+/integrations/openclaw-plugin/src/resources.generated.ts
+!/integrations/openclaw-plugin/static/
+!/integrations/openclaw-plugin/static/overview.css

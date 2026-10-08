@@ -1,15 +1,15 @@
-import { constants, lstatSync, realpathSync, readFileSync } from "node:fs";
+import { constants, lstatSync, realpathSync } from "node:fs";
 import { open } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join, resolve, sep, extname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { OVERVIEW_CSS_TEXT } from "./resources.generated.js";
 import type { DsaConfig } from "./config.js";
 import { ReportData, type ReportView } from "./data.js";
 import { APP_BASE, ROUTE_ROOT, RequestError, apiRoute, boundHeaders, canonicalUrl } from "./policy.js";
 import { appSecurity, createDsaProxy, type ProxyTestOptions } from "./proxy.js";
 
 const OVERVIEW_CSP = "default-src 'none'; script-src 'none'; style-src 'self'; img-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'";
-const OVERVIEW_CSS = readFileSync(fileURLToPath(new URL("../static/overview.css", import.meta.url)));
+const OVERVIEW_CSS = Buffer.from(OVERVIEW_CSS_TEXT, "utf8");
 const SPA_ROUTES = new Set(["/", "/login", "/settings", "/chat", "/portfolio", "/decision-signals", "/screening", "/data", "/backtest", "/alerts", "/usage"]);
 const TYPES: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".webp": "image/webp", ".woff2": "font/woff2" };
 export function escapeHtml(value: unknown): string {

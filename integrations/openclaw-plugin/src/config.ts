@@ -1,5 +1,4 @@
 import { isAbsolute, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 export interface DsaConfig {
   dbPath: string;
@@ -13,10 +12,25 @@ export interface DsaConfig {
 }
 const DEFAULTS: DsaConfig = {
   dbPath: "",
-  staticDir: fileURLToPath(new URL("../app/", import.meta.url)),
+  staticDir: "",
   tailscaleBin: "/usr/bin/tailscale", tailscaleLogin: "",
   cloudflareAccessHost: "", cloudflareAccessIssuer: "",
   cloudflareAccessAudience: "", cloudflareAccessEmail: "",
+};
+// Ordinary JSON Schema is accepted by the public SDK. Keep authoring metadata
+// and runtime parsing on the same strict field set; no location-relative defaults.
+export const configSchema = {
+  type: "object", additionalProperties: false, required: ["dbPath", "staticDir"],
+  properties: {
+    dbPath: { type: "string", minLength: 1 },
+    staticDir: { type: "string", minLength: 1 },
+    tailscaleBin: { type: "string", default: "/usr/bin/tailscale" },
+    tailscaleLogin: { type: "string", default: "", maxLength: 320 },
+    cloudflareAccessHost: { type: "string", default: "", maxLength: 253 },
+    cloudflareAccessIssuer: { type: "string", default: "", maxLength: 512 },
+    cloudflareAccessAudience: { type: "string", default: "", maxLength: 2048 },
+    cloudflareAccessEmail: { type: "string", default: "", maxLength: 320 },
+  },
 };
 export function parseConfig(input: Record<string, unknown> = {}): DsaConfig {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Plugin config must be an object");

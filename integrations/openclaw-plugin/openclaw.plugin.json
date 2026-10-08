@@ -1,7 +1,7 @@
 {
   "id": "dsa-workbench",
   "name": "DSA Workbench",
-  "description": "Read-only stock reports and a guarded same-origin top-level original manual workbench.",
+  "description": "Saved stock reports and a private same-origin original DSA workbench.",
   "version": "0.1.0",
   "activation": {
     "onStartup": true
@@ -10,7 +10,8 @@
     "type": "object",
     "additionalProperties": false,
     "required": [
-      "dbPath"
+      "dbPath",
+      "staticDir"
     ],
     "properties": {
       "dbPath": {
@@ -87,5 +88,8 @@
       "help": "Existing private ingress identity; do not auto-populate or relax.",
       "sensitive": true
     }
+  },
+  "contracts": {
+    "tools": []
   }
 }

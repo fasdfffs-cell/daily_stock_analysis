@@ -25,9 +25,10 @@ function seeded(path) {
 
 test('explicit admin configuration pins issuer and keeps email optional', () => {
   const dbPath = join(tmpdir(), 'fixture.db');
-  assert.equal(parseConfig({ dbPath, cloudflareAccessHost: 'dsa.example.invalid', cloudflareAccessIssuer: 'https://team.cloudflareaccess.com', cloudflareAccessAudience: 'fixture' }).cloudflareAccessEmail, '');
-  for (const input of [{}, { dbPath: 'relative.db' }, { dbPath, targetUrl: 'https://other.invalid' }, { dbPath, cloudflareAccessHost: 'dsa.example.invalid' }]) assert.throws(() => parseConfig(input));
-  for (const issuer of ['http://team.cloudflareaccess.com', 'https://team.cloudflareaccess.com/keys', 'https://team.cloudflareaccess.com.evil.invalid', 'https://other.invalid', 'https://team.cloudflareaccess.com:443', 'https://team.cloudflareaccess.com/']) assert.throws(() => parseConfig({ dbPath, cloudflareAccessHost: 'dsa.example.invalid', cloudflareAccessAudience: 'fixture', cloudflareAccessEmail: 'owner@example.invalid', cloudflareAccessIssuer: issuer }));
+  const staticDir = join(tmpdir(), 'fixture-app');
+  assert.equal(parseConfig({ dbPath, staticDir, cloudflareAccessHost: 'dsa.example.invalid', cloudflareAccessIssuer: 'https://team.cloudflareaccess.com', cloudflareAccessAudience: 'fixture' }).cloudflareAccessEmail, '');
+  for (const input of [{}, { dbPath }, { dbPath: 'relative.db', staticDir }, { dbPath, staticDir: 'relative' }, { dbPath, staticDir, targetUrl: 'https://other.invalid' }, { dbPath, staticDir, cloudflareAccessHost: 'dsa.example.invalid' }]) assert.throws(() => parseConfig(input));
+  for (const issuer of ['http://team.cloudflareaccess.com', 'https://team.cloudflareaccess.com/keys', 'https://team.cloudflareaccess.com.evil.invalid', 'https://other.invalid', 'https://team.cloudflareaccess.com:443', 'https://team.cloudflareaccess.com/']) assert.throws(() => parseConfig({ dbPath, staticDir, cloudflareAccessHost: 'dsa.example.invalid', cloudflareAccessAudience: 'fixture', cloudflareAccessEmail: 'owner@example.invalid', cloudflareAccessIssuer: issuer }));
 });
 
 test('original report view is read-only; assets reject hidden paths and all symlinks', async () => {
