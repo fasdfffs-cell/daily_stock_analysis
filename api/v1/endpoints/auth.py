@@ -72,7 +72,14 @@ class AuthSettingsRequest(BaseModel):
 def _cookie_params(request: Request) -> dict:
     """Build cookie params including Secure based on request."""
     secure = False
-    if os.getenv("TRUST_X_FORWARDED_FOR", "false").lower() == "true":
+    from src.workbench import is_manual_workbench
+    if is_manual_workbench():
+        from urllib.parse import urlsplit
+        public = urlsplit(os.environ["PUBLIC_URL"])
+        if public.scheme not in {"http", "https"} or not public.netloc or public.username or public.password or public.query or public.fragment or public.path not in {"", "/"}:
+            raise RuntimeError("Manual workbench requires a validated root PUBLIC_URL")
+        secure = public.scheme == "https"
+    elif os.getenv("TRUST_X_FORWARDED_FOR", "false").lower() == "true":
         proto = request.headers.get("X-Forwarded-Proto", "").lower()
         secure = proto == "https"
     else:

@@ -17,6 +17,12 @@ def envelope(text='{"ok":true}'):
     return {"ok": True, "capability": "model.run", "transport": "gateway", "provider": "fixture", "model": "demo", "attempts": [], "outputs": [{"text": text, "mediaUrl": None}]}
 
 
+def gateway_response(text='{"ok":true}'):
+    return {"runId": "fixture-run", "status": "ok", "result": {
+        "meta": {"agentMeta": {"provider": "fixture", "model": "demo", "fallbackAttempts": []}},
+        "payloads": [{"text": text, "mediaUrl": None, "mediaUrls": None}]}}
+
+
 @pytest.mark.parametrize("change,code", [
     ({"ok": False}, GenerationErrorCode.SCHEMA_VALIDATION_FAILED),
     ({"transport": "local"}, GenerationErrorCode.SCHEMA_VALIDATION_FAILED),
@@ -47,7 +53,7 @@ def test_envelope_json_size_actual_identity():
 def fake_cli(tmp_path, monkeypatch):
     home = tmp_path / "managed-home"; home.mkdir()
     binary = tmp_path / "cli"
-    binary.write_text(f"#!{sys.executable}\nimport json,sys,os\nfrom pathlib import Path\nPath(os.environ['HOME'],'receipt.json').write_text(json.dumps({{'argv':sys.argv[1:],'env_keys':list(os.environ)}}))\nprint({json.dumps(envelope())!r})\n")
+    binary.write_text(f"#!{sys.executable}\nimport json,sys,os\nfrom pathlib import Path\nPath(os.environ['HOME'],'receipt.json').write_text(json.dumps({{'argv':sys.argv[1:],'env_keys':list(os.environ)}}))\nprint({json.dumps(gateway_response())!r})\n")
     binary.chmod(0o700)
     monkeypatch.setenv("OPENCLAW_CLI_BINARY", str(binary))
     monkeypatch.setenv("OPENCLAW_CLI_HOME", str(home))
@@ -64,7 +70,17 @@ def test_fixed_argv_no_shell_no_credential_environment(fake_cli, monkeypatch):
     text = "--model bad/route; $(touch never)\n--local"
     result = OpenClawGenerationBackend(SimpleNamespace()).generate(text, {}, system_prompt="system")
     receipt = json.loads((home / "receipt.json").read_text())
-    assert receipt["argv"] == ["infer", "model", "run", "--gateway", "--agent", "fixture_agent", "--prompt", "system\n\n" + text, "--json", "--thinking", "max"]
+    argv = receipt["argv"]
+    assert argv[:8] == ["gateway", "call", "agent", "--expect-final", "--timeout", "600000", "--json", "--params"]
+    params = json.loads(argv[8])
+    assert set(params) == {"agentId", "sessionId", "sessionKey", "message", "thinking", "modelRun", "promptMode", "cleanupBundleMcpOnRunEnd", "idempotencyKey"}
+    assert params["agentId"] == "fixture_agent" and params["thinking"] == "max"
+    assert params["message"] == "system\n\n" + text
+    assert params["modelRun"] is True and params["promptMode"] == "none" and params["cleanupBundleMcpOnRunEnd"] is True
+    assert params["sessionId"].startswith("model-run-")
+    assert params["sessionKey"] == f'agent:fixture_agent:explicit:{params["sessionId"]}'
+    assert params["idempotencyKey"] != params["sessionId"]
+    assert "provider" not in params and "model" not in params and "tools" not in params
     assert "QQ_APP_SECRET" not in receipt["env_keys"] and "OPENAI_API_KEY" not in receipt["env_keys"]
     assert result.model == "fixture/demo" and result.backend == "openclaw_cli"
     assert result.usage == {}  # not invented zero-token usage
@@ -242,3 +258,67 @@ def test_no_automatic_market_context_model(manual_client):
     pipeline = StockAnalysisPipeline(config=get_config(), daily_market_context_enabled=True, daily_market_context_allow_generate=True)
     assert pipeline.daily_market_context_enabled is False
     assert pipeline.daily_market_context_allow_generate is False
+
+
+@pytest.mark.parametrize("public,xfp,secure", [
+    ("http://127.0.0.1:18102/", "https", False),
+    ("https://private.invalid/", "http", True),
+    ("https://private.invalid/", "https", True),
+])
+def test_manual_cookie_uses_fixed_public_origin_not_untrusted_forwarded_headers(manual_client, monkeypatch, public, xfp, secure):
+    from starlette.requests import Request
+    from api.v1.endpoints.auth import _cookie_params
+    monkeypatch.setenv("PUBLIC_URL", public)
+    monkeypatch.setenv("TRUST_X_FORWARDED_FOR", "true")
+    request = Request({"type": "http", "scheme": "http", "server": ("127.0.0.1", 18102), "headers": [(b"x-forwarded-proto", xfp.encode())]})
+    assert _cookie_params(request)["secure"] is secure
+
+
+@pytest.mark.parametrize("ignore_term", [False, True])
+def test_cleanup_exited_parent_and_lingering_pipe_child(fake_cli, ignore_term):
+    import signal, subprocess, time
+    binary, home = fake_cli
+    child_code = f"import signal,time;from pathlib import Path;signal.signal(signal.SIGTERM, signal.SIG_IGN if {ignore_term!r} else signal.SIG_DFL);Path({str(home/'ready')!r}).write_text('ready');time.sleep(30)"
+    binary.write_text(f"#!{sys.executable}\nimport subprocess,sys,time\nfrom pathlib import Path\np=subprocess.Popen([sys.executable,'-c',{child_code!r}])\nPath({str(home/'descendant.pid')!r}).write_text(str(p.pid))\nwhile not Path({str(home/'ready')!r}).exists(): time.sleep(.01)\nsys.exit(0)\n")
+    try:
+        with pytest.raises(GenerationError) as failure:
+            OpenClawGenerationBackend(SimpleNamespace(generation_backend_timeout_seconds=1)).generate("fixture", {})
+        assert failure.value.error_code == GenerationErrorCode.TIMEOUT
+        pid = int((home / "descendant.pid").read_text())
+        stat = Path(f"/proc/{pid}/stat")
+        deadline = time.monotonic() + 1
+        while stat.exists() and stat.read_text().split(') ')[1].split()[0] not in {"Z", "X"} and time.monotonic() < deadline:
+            time.sleep(0.05)  # bounded kernel SIGKILL delivery, not parent-only wait
+        assert not stat.exists() or stat.read_text().split(') ')[1].split()[0] in {"Z", "X"}
+        from src.llm.openclaw_backend import active_model_runs
+        assert not active_model_runs()
+    finally:
+        if (home / "descendant.pid").exists():
+            try: os.kill(int((home / "descendant.pid").read_text()), signal.SIGKILL)
+            except ProcessLookupError: pass
+
+
+def test_serialized_prompt_json_budget_and_gateway_raw_schema(fake_cli):
+    from src.llm.openclaw_backend import decode_gateway_response
+    with pytest.raises(GenerationError) as failure:
+        OpenClawGenerationBackend(SimpleNamespace()).generate('"' * 60000, {})
+    assert failure.value.error_code == GenerationErrorCode.OUTPUT_TOO_LARGE
+    data = gateway_response()
+    assert decode_gateway_response(json.dumps(data).encode(), 4096)[1:3] == ("fixture", "demo")
+    data["result"]["meta"]["agentMeta"]["provider"] = None
+    with pytest.raises(GenerationError): decode_gateway_response(json.dumps(data).encode(), 4096)
+    with pytest.raises(GenerationError): decode_gateway_response(json.dumps(envelope()).encode(), 4096)
+
+
+@pytest.mark.parametrize("text,category,code", [
+    ('{"error":{"code":"TIMEOUT"}}', 'timeout', GenerationErrorCode.TIMEOUT),
+    ('{"error":{"code":"UNAUTHORIZED"}}', 'auth', GenerationErrorCode.LOGIN_REQUIRED),
+    ('{"error":{"message":"policy denied"}}', 'policy', GenerationErrorCode.APPROVAL_REQUIRED),
+    ('{"error":{"code":"INVALID_REQUEST"}}', 'request_validation', GenerationErrorCode.SCHEMA_VALIDATION_FAILED),
+])
+def test_safe_gateway_error_category_without_messages(text, category, code):
+    from src.llm.openclaw_backend import safe_cli_failure
+    value = safe_cli_failure(text.encode(), b'synthetic_secret=do-not-copy', 1)
+    assert value.error_code == code and value.stage == 'gateway'
+    assert value.details['category'] == category and value.details['status'] == 'exit_1'
+    assert 'secret' not in json.dumps(value.details) and 'do-not-copy' not in json.dumps(value.details)

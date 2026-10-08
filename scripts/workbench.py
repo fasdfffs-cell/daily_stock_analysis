@@ -84,8 +84,8 @@ def main():
     parser.add_argument("--thinking", default="", choices=("", "off", "minimal", "low", "medium", "high", "adaptive", "xhigh", "max"))
     parser.add_argument("--model-timeout", type=int, default=600)
     args = parser.parse_args()
-    if not 1 <= args.model_timeout <= 1800:
-        parser.error("Model timeout must be 1..1800 seconds")
+    if not 1 <= args.model_timeout <= 600:
+        parser.error("Model timeout must be 1..600 seconds")
     env, runtime = prepare_environment(args, dict(os.environ))
     packages = runtime / "packages"
     if not packages.is_dir():

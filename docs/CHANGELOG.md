@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [修复] 私人工作台按保存的进程组清理已退出 CLI 的管道子进程（含忽略 TERM 的后代），HTTPS Cookie Secure 由校验后的固定入口决定而非不可信转发头。
+- [改进] OpenClaw 文本后端采用官方 Gateway agent/modelRun 隔离调用延长客户端等待至最多 600 秒，保留 max、禁 tools/MCP 与原路由策略，校验完整 JSON argv 预算并分类安全失败。
+
 - [新功能] 增加原版工作台的私人手动运行入口、独立依赖／数据目录及真实 `openclaw_cli` 文本生成后端；复用 React/FastAPI 的自选、单股分析、SSE 与历史报告。
 - [改进] 手动模式强制登录和同源写入，后端禁用配置旁门、调度／预热、通知／文档、交易／回测及自动大盘生成；报告区分配置目标、实际模型和日线日期。
 - [测试] 增加固定 argv、模型 JSON／失败／超限、认证、外发终点、启动无网络及手动 API 边界回归。
