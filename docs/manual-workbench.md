@@ -188,3 +188,7 @@ native through the UI or helper plus authorized app restart. Backend must stay u
 no permanent service or downtime replay is provided by this candidate. Never leave
 both owners enabled. Source/build/fixture success is not production loading or
 financial-correctness proof.
+
+### Research navigation visibility
+
+Both manual and native research builds keep all ten DSA navigation links visible, including on the scrollable desktop rail and mobile menu. Unopened links show `未开放` / `Not enabled` in the selected UI language and still navigate to the existing disabled explanation, without mounting their original business pages. Native research retains only home, portfolio, backtest and native settings routes; manual mode retains home only. Standard builds have no unopened badges. This is navigation display only, not a change to API permissions, authentication or the OpenClaw sidebar.

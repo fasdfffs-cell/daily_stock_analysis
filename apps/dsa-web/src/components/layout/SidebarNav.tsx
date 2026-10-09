@@ -43,7 +43,7 @@ const NAV_ITEMS: NavItem[] = [
 export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNavigate, variant = 'default' }) => {
   const { authEnabled, logout } = useAuth();
   const location = useLocation();
-  const { t } = useUiLanguage();
+  const { t, language } = useUiLanguage();
   const completionBadge = useAgentChatStore((state) => state.completionBadge);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const isRail = variant === 'rail';
@@ -85,9 +85,11 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
         ) : null}
       </div>
 
-      <nav className={cn('flex flex-col gap-1.5', isRail ? 'min-h-0 overflow-y-auto' : 'flex-1')} aria-label={t('layout.mainNav')}>
-        {NAV_ITEMS.filter(item => !MANUAL_WORKBENCH || (NATIVE_RESEARCH ? RESEARCH_ROUTES.has(item.to) : item.to === '/')).map(({ key, labelKey, to, icon: Icon, exact, badge }) => {
+      <nav className={cn('flex min-h-0 flex-col gap-1.5 overflow-y-auto', isRail ? '' : 'flex-1')} aria-label={t('layout.mainNav')}>
+        {NAV_ITEMS.map(({ key, labelKey, to, icon: Icon, exact, badge }) => {
           const label = t(labelKey);
+          const unopened = MANUAL_WORKBENCH && !(NATIVE_RESEARCH ? RESEARCH_ROUTES.has(to) : to === '/');
+          const unopenedLabel = language === 'en' ? 'Not enabled' : '未开放';
           return (
           <NavLink
             key={key}
@@ -95,19 +97,29 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
             end={exact}
             onClick={onNavigate}
             aria-label={label}
+            title={unopened ? `${label} · ${unopenedLabel}` : undefined}
             className={({ isActive }) =>
               cn(
                 itemInteractiveClass,
                 'shrink-0',
+                unopened && isRail && !collapsed ? 'h-auto flex-col gap-1 py-2' : '',
                 isActive ? itemActiveClass : ''
               )
             }
           >
             {({ isActive }) => (
               <>
-                <Icon className={cn(itemIconClass, isActive ? 'text-[var(--nav-icon-active)]' : 'text-current')} />
-                {!collapsed ? <span className={itemLabelClass}>{label}</span> : null}
-                {badge === 'completion' && completionBadge ? (
+                <span className={cn('flex min-w-0 items-center', isRail ? 'gap-2.5' : 'gap-3')}>
+                  <Icon className={cn(itemIconClass, isActive ? 'text-[var(--nav-icon-active)]' : 'text-current')} />
+                  {!collapsed ? <span className={itemLabelClass}>{label}</span> : null}
+                </span>
+                {unopened ? (
+                  <span className={cn(
+                    'shrink-0 rounded border border-border px-1 py-0.5 text-[10px] leading-none text-secondary-text',
+                    collapsed ? 'absolute bottom-1 left-1/2 -translate-x-1/2' : isRail ? '' : 'ml-auto'
+                  )}>{unopenedLabel}</span>
+                ) : null}
+                {badge === 'completion' && completionBadge && !unopened ? (
                   <StatusDot
                     tone="info"
                     data-testid="chat-completion-badge"

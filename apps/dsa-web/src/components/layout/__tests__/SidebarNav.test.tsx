@@ -27,6 +27,15 @@ vi.mock('../../theme/ThemeToggle', () => ({
 }));
 
 describe('SidebarNav', () => {
+  it('keeps all ten standard menus with no unopened badge and a scrollable menu', () => {
+    render(<MemoryRouter><SidebarNav /></MemoryRouter>);
+    const nav = screen.getByRole('navigation', { name: '主导航' });
+    expect(screen.getAllByRole('link')).toHaveLength(10);
+    expect(screen.queryByText('未开放')).not.toBeInTheDocument();
+    expect(screen.queryByText('Not enabled')).not.toBeInTheDocument();
+    expect(nav).toHaveClass('min-h-0', 'overflow-y-auto');
+  });
+
   it('keeps screening directly after chat without requiring configuration', () => {
     render(<MemoryRouter initialEntries={['/']}><SidebarNav /></MemoryRouter>);
 

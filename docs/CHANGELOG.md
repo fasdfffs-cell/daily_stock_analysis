@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [改进] DSA 私人研究侧边栏保留全部十个菜单，未开放项可点击查看原有说明并显示中英文标识；不改变路由、API 或功能授权。
+
 - [新功能] 增加默认停用的私人原生研究模式：复用 DSA 原生定时与受限设置，独立 QQQ 排程、手工持仓账本及仅本地数据的手动回测，保持鉴权与单模型隔离。
 
 - [新功能] 增加 source-only QQQ 北京时间 19:00 本地分析入口，复用原 AnalysisService／历史 DB 与官方模型适配器；美股日历 fail-closed、原日线来源日期、私有原子幂等占位和进程间模型锁；仅提供离线测试／只读检查与未创建的 owner 任务草案，不启用调度或外发。
