@@ -256,9 +256,15 @@ class RuntimeSchedulerService:
         run_immediately_in_background: bool = False,
         background_tasks_provider: Optional[Callable[[Config], List[Dict[str, Any]]]] = None,
         schedule_args_overrides: Optional[Dict[str, Any]] = None,
+        inline_task_runner: bool = False,
+        schedule_timezone: Optional[str] = None,
     ) -> None:
         self._config_provider = config_provider
         self._task_runner = task_runner
+        self._inline_task_runner = inline_task_runner
+        self._schedule_timezone = schedule_timezone
+        if inline_task_runner and task_runner is None:
+            raise ValueError("Inline execution requires an explicit trusted callback")
         if owns_schedule is None:
             owns_schedule = os.getenv(CLI_SCHEDULER_OWNER_ENV, "").strip().lower() not in {
                 "1",
@@ -313,6 +319,8 @@ class RuntimeSchedulerService:
         return SimpleNamespace(**defaults)
 
     def _reload_config(self) -> Config:
+        if self._inline_task_runner:
+            return self._config_provider()
         from main import _reload_runtime_config
 
         return _reload_runtime_config()
@@ -338,6 +346,11 @@ class RuntimeSchedulerService:
             args = self._make_schedule_args()
             args._scheduled_for = scheduled_for
             result = runner(config, args, stock_codes)
+            if self._inline_task_runner and isinstance(result, dict) and result.get("status") != "success":
+                self._last_skipped_at = datetime.now().isoformat()
+                self._last_skip_reason = result.get("status", "skipped")
+                self._last_error = None
+                return True
             if result is False:
                 raise RuntimeError("runtime scheduled analysis reported failure")
             self._last_success_at = datetime.now().isoformat()
@@ -498,6 +511,13 @@ class RuntimeSchedulerService:
         result_queue = None
         timeout_partial_context: Optional[Dict[str, Any]] = None
         try:
+            if self._inline_task_runner:
+                # Reuse this service's bounded dispatch/lock, not main.py or a spawned runtime.
+                with self._analysis_process_lock:
+                    if generation != self._analysis_generation:
+                        return
+                self._run_analysis_locked(stock_codes, scheduled_for=scheduled_for)
+                return
             context = multiprocessing.get_context("spawn")
             result_queue = context.Queue()
             overrides = dict(self._schedule_args_overrides)
@@ -722,6 +742,8 @@ class RuntimeSchedulerService:
                 schedule_times_provider=self._current_times,
                 register_signals=False,
                 pass_scheduled_for=True,
+                timezone=self._schedule_timezone,
+                isolated_schedule=self._inline_task_runner,
             )
             if run_immediately and self._run_immediately_in_background:
                 scheduler.set_daily_task(scheduled_analysis, run_immediately=False)

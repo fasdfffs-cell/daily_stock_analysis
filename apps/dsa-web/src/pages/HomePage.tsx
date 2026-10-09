@@ -1,5 +1,5 @@
 import type React from 'react';
-import { MANUAL_WORKBENCH } from '../utils/workbench';
+import { MANUAL_WORKBENCH, NATIVE_RESEARCH } from '../utils/workbench';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Check, SlidersHorizontal, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -855,6 +855,7 @@ const HomePage: React.FC = () => {
   const [isDeletingStock, setIsDeletingStock] = useState(false);
   const handleDeleteStock = useCallback(async (stockCode: string) => {
     if (isDeletingStock) return;
+    if (MANUAL_WORKBENCH && !window.confirm(`确认删除 ${stockCode} 的全部历史报告？此操作不可撤销。`)) return;
     setIsDeletingStock(true);
     try {
       await historyApi.deleteByCode(stockCode);
@@ -1308,7 +1309,7 @@ const HomePage: React.FC = () => {
     let confirmedCodeCount = 0;
     let submissionError: ParsedApiError | null = null;
     try {
-      for (const chunk of chunkStockCodes(targetCodes)) {
+      for (const chunk of (NATIVE_RESEARCH ? targetCodes.map(code => [code]) : chunkStockCodes(targetCodes))) {
         try {
           const result = await analysisApi.analyzeAsync({
             stockCodes: chunk,

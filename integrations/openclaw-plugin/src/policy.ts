@@ -58,10 +58,12 @@ export function sessionCookie(req: IncomingMessage): string | undefined {
   if (!/^dsa_session=[A-Za-z0-9_.:\-]{1,2048}$/.test(sessions[0])) throw new RequestError(400, "Invalid DSA session cookie");
   return sessions[0];
 }
-export type ApiKind = "status" | "login" | "password" | "logout" | "read" | "sse" | "analyze" | "watchlist" | "cancel";
+export type ApiKind = "status" | "login" | "password" | "logout" | "read" | "sse" | "analyze" | "watchlist" | "cancel" | "settings" | "portfolio" | "backtest" | "delete";
 export interface ApiRoute { path: string; kind: ApiKind; write: boolean; }
 export function apiRoute(url: URL, method: string): ApiRoute {
   const path = url.pathname.slice(APP_BASE.length);
+  const native = nativeResearchRoute(path, method);
+  if (native) { validateResearchQuery(url, native.query); return { path, kind: native.kind, write: native.write }; }
   const reads: [RegExp, ApiKind, string[]][] = [
     [/^\/api\/v1\/auth\/status$/, "status", []],
     [/^\/api\/v1\/workbench\/status$/, "read", []],
@@ -89,6 +91,27 @@ export function apiRoute(url: URL, method: string): ApiRoute {
   }
   return { path, kind: (read?.[1] || write?.[1])!, write: Boolean(write) };
 }
+// Additions mirror the backend research allowlist. Ordinary manual mode still
+// rejects these at its own guard; all requests retain ingress identity + cookie.
+function nativeResearchRoute(path: string, method: string): { kind: ApiKind; write: boolean; query: string[] } | undefined {
+  const reads: [RegExp, string[]][] = [
+    [/^\/api\/v1\/system\/(?:config|scheduler\/status)$/, ["include_schema"]],
+    [/^\/api\/v1\/portfolio\/(?:accounts|trades|cash-ledger|corporate-actions|snapshot)$/, ["include_inactive", "account_id", "as_of", "cost_method", "include_realtime", "date_from", "date_to", "symbol", "side", "direction", "action_type", "page", "page_size"]],
+    [/^\/api\/v1\/backtest\/(?:results|performance|performance\/[A-Z][A-Z0-9.\-]{0,14})$/, ["code", "eval_window_days", "analysis_date_from", "analysis_date_to", "analysis_phase", "page", "limit"]],
+  ];
+  if (["GET", "HEAD"].includes(method)) { const read = reads.find(([re]) => re.test(path)); if (read) return { kind: "read", write: false, query: read[1] }; }
+  if (method === "PUT" && path === "/api/v1/system/config") return { kind: "settings", write: true, query: [] };
+  if (method === "POST" && /^\/api\/v1\/backtest\/run$/.test(path)) return { kind: "backtest", write: true, query: [] };
+  if (method === "POST" && /^\/api\/v1\/portfolio\/(?:accounts|trades|cash-ledger|corporate-actions)$/.test(path) || method === "PUT" && /^\/api\/v1\/portfolio\/accounts\/[1-9][0-9]{0,9}$/.test(path)) return { kind: "portfolio", write: true, query: [] };
+  if (method === "DELETE" && (/^\/api\/v1\/history\/by-code\/[A-Z][A-Z0-9.\-]{0,14}$/.test(path) || /^\/api\/v1\/portfolio\/(?:accounts|trades|cash-ledger|corporate-actions)\/[1-9][0-9]{0,9}$/.test(path))) return { kind: "delete", write: true, query: [] };
+  return undefined;
+}
+function validateResearchQuery(url: URL, allowed: string[]): void {
+  for (const [key, value] of url.searchParams) {
+    if (!allowed.includes(key) || url.searchParams.getAll(key).length !== 1 || value.length > 100 || /[\x00-\x1f\x7f]/.test(value)) throw new RequestError(400, "Unsupported research query");
+    if (["page", "page_size", "limit", "account_id", "eval_window_days"].includes(key) && (!/^[1-9][0-9]{0,5}$/.test(value) || Number(value) > (key === "page" ? 10000 : key === "account_id" ? 999999 : 200))) throw new RequestError(400, "Research query bound exceeded");
+  }
+}
 function checkedObject(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new RequestError(400, "JSON object required");
   return value as Record<string, unknown>;
@@ -113,11 +136,26 @@ export async function writeBody(req: IncomingMessage, kind: ApiKind): Promise<Bu
     catch { throw new RequestError(400, "Invalid JSON body"); }
   }
   const allowed: Partial<Record<ApiKind, string[]>> = {
+    settings: ["config_version", "reload_now", "items"],
+    portfolio: ["name", "broker", "market", "base_currency", "owner_id", "is_active", "account_id", "symbol", "trade_date", "side", "quantity", "price", "fee", "tax", "currency", "trade_uid", "note", "event_date", "direction", "amount", "effective_date", "action_type", "cash_dividend_per_share", "split_ratio"],
+    backtest: ["code", "force", "eval_window_days", "min_age_days", "analysis_date_from", "analysis_date_to", "limit"], delete: [],
     login: ["password", "passwordConfirm"], password: ["currentPassword", "newPassword", "newPasswordConfirm"], logout: [], cancel: [], watchlist: ["stock_code"],
     analyze: ["stock_code", "stock_codes", "report_type", "force_refresh", "async_mode", "analysis_phase", "stock_name", "original_query", "selection_source", "skills", "report_language", "notify"],
   };
   if (Object.keys(body).some(key => !allowed[kind]?.includes(key))) throw new RequestError(400, "Unknown body field");
+  if (kind === "settings") {
+    if (typeof body.config_version !== "string" || body.config_version.length > 200 || body.reload_now !== true || !Array.isArray(body.items) || body.items.length < 1 || body.items.length > 2) throw new RequestError(400, "Invalid schedule settings");
+    const seen = new Set<string>();
+    for (const raw of body.items) {
+      const item = checkedObject(raw);
+      if (Object.keys(item).some(k => !["key", "value"].includes(k)) || typeof item.key !== "string" || typeof item.value !== "string" || seen.has(item.key)) throw new RequestError(400, "Invalid schedule field");
+      seen.add(item.key);
+      if (item.key === "SCHEDULE_ENABLED" ? !["true", "false"].includes(item.value) : item.key === "SCHEDULE_TIME" ? !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(item.value) : true) throw new RequestError(400, "Schedule field outside approved scope");
+    }
+    return Buffer.from(JSON.stringify(body));
+  }
   for (const value of Object.values(body)) {
+    if (typeof value === "number" && !Number.isFinite(value)) throw new RequestError(400, "Non-finite numeric field");
     if (typeof value === "string" && value.length > 4096 || value && typeof value === "object" && (!Array.isArray(value) || value.length > 8 || value.some(v => typeof v !== "string" || v.length > 200))) throw new RequestError(400, "Body field too large or unsupported");
   }
   if (["login", "password"].includes(kind) && Object.values(body).some(v => typeof v !== "string" || v.length > 1024)) throw new RequestError(400, "Invalid authentication field");

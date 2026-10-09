@@ -5,7 +5,15 @@ import os
 
 
 def is_manual_workbench() -> bool:
-    return os.getenv("DSA_RUNTIME_MODE") == "manual_workbench"
+    return os.getenv("DSA_RUNTIME_MODE") in {"manual_workbench", "native_research"}
+
+
+def is_native_research() -> bool:
+    return os.getenv("DSA_RUNTIME_MODE") == "native_research"
+
+
+def mutable_workbench_keys() -> set[str]:
+    return {"STOCK_LIST", "SCHEDULE_ENABLED", "SCHEDULE_TIME"} if is_native_research() else {"STOCK_LIST"}
 
 
 def prohibit_outbound() -> None:
@@ -17,7 +25,7 @@ def workbench_status() -> dict:
     from src.llm.openclaw_backend import active_model_runs
     return {
         "active_model_requests": active_model_runs(),
-        "mode": "manual_workbench" if is_manual_workbench() else "standard",
+        "mode": "native_research" if is_native_research() else "manual_workbench" if is_manual_workbench() else "standard",
         "backend": "openclaw_cli" if is_manual_workbench() else None,
         "configured_target": os.getenv("OPENCLAW_CONFIGURED_TARGET") or None,
         "thinking": os.getenv("OPENCLAW_THINKING") or "inherited",

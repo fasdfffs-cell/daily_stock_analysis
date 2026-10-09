@@ -6,13 +6,14 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from api.v1.schemas.market_phase import MarketPhaseSummary
 from src.schemas.decision_action import DecisionAction
 
 
 class BacktestRunRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
     code: Optional[str] = Field(None, description="仅回测指定股票")
     force: bool = Field(False, description="强制重新计算")
     eval_window_days: Optional[int] = Field(None, ge=1, le=120, description="评估窗口（交易日数）")

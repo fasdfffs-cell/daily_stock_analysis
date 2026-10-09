@@ -39,7 +39,7 @@ entry.register = (api) => {
     registerDeclaredTools(api);
     api.session.controls.registerControlUiDescriptor({
       surface: "tab", id: "dsa-workbench", label: "股票研究",
-      description: "原 DSA 报告概览与完整私人手动工作台", icon: "chart-line",
+      description: "原 DSA 报告与私人研究工作台 · 原生定时", icon: "chart-line",
       group: "agent", order: 40, path: `${ROUTE_ROOT}/`, requiredScopes: ["operator.read"],
     });
     api.registerHttpRoute({

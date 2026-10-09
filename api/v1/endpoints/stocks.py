@@ -56,6 +56,9 @@ ALLOWED_MIME_STR = ", ".join(ALLOWED_MIME)
 
 def _read_watchlist_codes(service: SystemConfigService) -> list:
     """Read STOCK_LIST codes as-is (no normalization)."""
+    from src.workbench import is_native_research
+    if is_native_research():
+        return split_stock_list(service._manager.read_config_map().get("STOCK_LIST", ""))
     config_data = service.get_config(include_schema=False)
     stock_list_str = ""
     for item in config_data.get("items", []):
@@ -67,6 +70,12 @@ def _read_watchlist_codes(service: SystemConfigService) -> list:
 
 def _write_watchlist_codes(service: SystemConfigService, codes: list) -> None:
     """Persist stock codes to STOCK_LIST as-is (no normalization)."""
+    from src.workbench import is_native_research
+    if is_native_research():
+        service._manager.apply_updates([("STOCK_LIST", ",".join(codes))], set(), "******")
+        from src.config import get_config
+        get_config().refresh_stock_list()
+        return
     config_data = service.get_config(include_schema=False)
     config_version = config_data.get("config_version", "")
     service.update(

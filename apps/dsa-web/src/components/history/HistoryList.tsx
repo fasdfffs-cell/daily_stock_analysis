@@ -1,3 +1,4 @@
+import { MANUAL_WORKBENCH } from '../../utils/workbench';
 import type React from 'react';
 import { useRef, useCallback, useEffect, useId } from 'react';
 import type { HistoryItem } from '../../types/analysis';
@@ -119,7 +120,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
             }
           />
 
-          {items.length > 0 && (
+          {items.length > 0 && !MANUAL_WORKBENCH && (
             <div className="flex items-center gap-2">
               <label
                 className="flex flex-1 cursor-pointer items-center gap-2 rounded-lg px-2 py-1"

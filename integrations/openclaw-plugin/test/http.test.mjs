@@ -79,10 +79,30 @@ test('native guarded routes, Origin/CSRF, cookies, redirects and SSE', async t =
     });
     await t.test('bad paths, queries, methods and disabled APIs never reach target', async () => {
       for (const path of [`${APP_BASE}/../index.html`, `${APP_BASE}/%2e%2e/index.html`, `${APP_BASE}/.env`, `${APP_BASE}//assets/main.js`, 'https://other.invalid/path']) assert.equal((await call(port, path)).status, 400);
-      for (const path of ['/system/config', '/system/config/export', '/auth/settings', '/agent/chat', '/portfolio/accounts', '/analysis/market-review', '/stocks/parse-import']) assert.equal((await call(port, `${APP_BASE}/api/v1${path}`, { headers: authenticated })).status, 403);
+      for (const path of ['/system/config/export', '/auth/settings', '/agent/chat', '/portfolio/import/parse', '/analysis/market-review', '/stocks/parse-import']) assert.equal((await call(port, `${APP_BASE}/api/v1${path}`, { headers: authenticated })).status, 403);
       assert.equal((await call(port, `${APP_BASE}/api/v1/history`, { method: 'DELETE', headers: authenticated })).status, 405);
       for (const query of ['url=https%3A%2F%2Fother.invalid', 'limit=101', 'limit=1&limit=2']) assert.equal((await call(port, `${APP_BASE}/api/v1/history?${query}`)).status, 400);
       assert.equal((await call(port, `${APP_BASE}/assets/main.js.map`)).status, 404); assert.equal((await call(port, `${APP_BASE}/login`)).headers['x-frame-options'], 'DENY');
+    });
+    await t.test('native research exact methods keep cookie, Origin and request identity guards', async () => {
+      const routes = [
+        ['/system/config', 'GET', ''], ['/system/scheduler/status', 'GET', ''],
+        ['/portfolio/accounts', 'GET', ''], ['/backtest/results', 'GET', ''],
+        ['/system/config', 'PUT', JSON.stringify({ config_version: 'fixture', reload_now: true, items: [{ key: 'SCHEDULE_TIME', value: '19:00' }] })],
+        ['/portfolio/accounts', 'POST', '{"name":"DEMO ledger","market":"us","base_currency":"USD"}'],
+        ['/portfolio/trades', 'POST', '{"account_id":1,"symbol":"QQQ","trade_date":"2026-10-08","side":"buy","quantity":1,"price":100}'],
+        ['/backtest/run', 'POST', '{"code":"QQQ","limit":10}'],
+        ['/history/by-code/QQQ', 'DELETE', '{}'], ['/portfolio/accounts/1', 'DELETE', '{}'],
+      ];
+      for (const [path, method, body] of routes) {
+        assert.equal((await call(port, `${APP_BASE}/api/v1${path}`, { method, headers: { ...authenticated, host, 'x-forwarded-proto':'https' }, body })).status, 401);
+        assert.equal((await call(port, `${APP_BASE}/api/v1${path}`, { method, headers: authenticated, body })).status, 200);
+        if (!['GET','HEAD'].includes(method)) assert.equal((await call(port, `${APP_BASE}/api/v1${path}`, { method, headers: { ...authenticated, origin:'https://evil.invalid' }, body })).status, 403);
+      }
+      for (const key of ['OPENAI_API_KEY','ADMIN_AUTH_ENABLED','STOCK_LIST','SCHEDULE_TIMES']) assert.equal((await call(port, `${APP_BASE}/api/v1/system/config`, { method:'PUT', headers:authenticated, body:JSON.stringify({ config_version:'fixture', reload_now:true, items:[{key,value:'false'}] }) })).status, 400);
+      assert.equal((await call(port, `${APP_BASE}/api/v1/system/config`, { method:'PUT', headers:authenticated, body:JSON.stringify({ config_version:'fixture', reload_now:true, items:[{key:'SCHEDULE_TIME',value:'25:00'}] }) })).status, 400);
+      assert.equal((await call(port, `${APP_BASE}/api/v1/portfolio/accounts`, { method:'POST', headers:authenticated, body:'{"name":"fixture","api_key":"forbidden"}' })).status, 400);
+      for (const path of ['/portfolio/accounts/1/broker','/portfolio/positions/QQQ/analysis','/portfolio/import/commit','/system/config/import']) assert.equal((await call(port, `${APP_BASE}/api/v1${path}`, { method:'POST', headers:authenticated, body:'{}' })).status, 403);
     });
     await t.test('mandatory DSA auth, bounded scoped cookie and header isolation', async () => {
       assert.equal((await call(port, `${APP_BASE}/api/v1/history`)).status, 401); authEnabled = false; assert.equal((await call(port, `${APP_BASE}/api/v1/auth/status`)).status, 503); authEnabled = true;

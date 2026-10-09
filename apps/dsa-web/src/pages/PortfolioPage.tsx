@@ -1,3 +1,4 @@
+import { NATIVE_RESEARCH } from '../utils/workbench';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Layers3, ShieldCheck } from 'lucide-react';
@@ -611,6 +612,7 @@ async function mapWithConcurrency<T, R>(
 
 async function loadPortfolioSignalLookup(lookup: PortfolioSignalLookup): Promise<PortfolioSignalLookupResult> {
   try {
+    if (NATIVE_RESEARCH) return { items: [], error: null };
     const response = await decisionSignalsApi.getLatest(lookup.stockCode, {
       market: lookup.market,
       limit: 1,
@@ -755,6 +757,7 @@ const PortfolioPage: React.FC = () => {
   }, []);
 
   const loadBrokers = useCallback(async () => {
+    if (NATIVE_RESEARCH) return;
     try {
       const response = await portfolioApi.listImportBrokers();
       const brokerItems = response.brokers || [];
@@ -793,6 +796,7 @@ const PortfolioPage: React.FC = () => {
       setError(null);
 
       try {
+        if (NATIVE_RESEARCH) { setRisk(null); return; }
         const riskData = await portfolioApi.getRisk({
           accountId: queryAccountId,
           costMethod,
@@ -1336,6 +1340,7 @@ const PortfolioPage: React.FC = () => {
       setError(null);
 
       try {
+        if (NATIVE_RESEARCH) { setRisk(null); return true; }
         const riskData = await portfolioApi.getRisk({
           accountId: requestedAccountId,
           costMethod: requestedCostMethod,
@@ -1429,6 +1434,7 @@ const PortfolioPage: React.FC = () => {
 
   return (
     <div className="portfolio-page min-h-screen space-y-4 p-4 md:p-6">
+      {NATIVE_RESEARCH && <p role="note" className="rounded-xl border border-border p-3 text-sm">手工账本：仅本地账户、成交、现金与企业行为记录。不接券商、不执行真实交易、不自动报价或更新汇率；缺失估值不代表零价值。CSV导入、持仓AI分析及风险扩展未开放。</p>}
       <section className="space-y-3">
         <div className="space-y-2">
           <h1 className="text-xl md:text-2xl font-semibold text-foreground">{text.title}</h1>
@@ -1631,7 +1637,7 @@ const PortfolioPage: React.FC = () => {
               type="button"
               className="btn-secondary !px-3 !py-1 !text-xs shrink-0"
               onClick={() => void handleRefreshFx()}
-              disabled={!hasAccounts || isLoading || fxRefreshing}
+              disabled={NATIVE_RESEARCH || !hasAccounts || isLoading || fxRefreshing}
             >
               {fxRefreshing ? text.refreshing : text.refreshFx}
             </button>
@@ -1790,7 +1796,7 @@ const PortfolioPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => void handleAnalyzePosition(row)}
-                          disabled={analyzing}
+                          disabled={NATIVE_RESEARCH || analyzing}
                           className="btn-secondary px-2 py-1 text-xs disabled:cursor-wait disabled:opacity-60"
                         >
                           {analyzing ? text.submitting : text.analyze}
@@ -2009,11 +2015,11 @@ const PortfolioPage: React.FC = () => {
               <label htmlFor="csv-dry-run">仅预演（不写入）</label>
             </div>
             <div className="flex gap-2">
-              <button type="button" className="btn-secondary flex-1" disabled={!csvFile || csvParsing} onClick={() => void handleParseCsv()}>
+              <button type="button" className="btn-secondary flex-1" disabled={NATIVE_RESEARCH || !csvFile || csvParsing} onClick={() => void handleParseCsv()}>
                 {csvParsing ? '解析中...' : '解析文件'}
               </button>
               <button type="button" className="btn-secondary flex-1"
-                disabled={!csvFile || !writableAccountId || csvCommitting} onClick={() => void handleCommitCsv()}>
+                disabled={NATIVE_RESEARCH || !csvFile || !writableAccountId || csvCommitting} onClick={() => void handleCommitCsv()}>
                 {csvCommitting ? '提交中...' : '提交导入'}
               </button>
             </div>

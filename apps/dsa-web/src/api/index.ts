@@ -12,6 +12,12 @@ const apiClient = axios.create({
   },
 });
 
+// DELETE remains explicit JSON so the guarded native proxy can bound its body.
+apiClient.interceptors.request.use(config => {
+  if (config.method === 'delete' && config.data === undefined) config.data = {};
+  return config;
+});
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {

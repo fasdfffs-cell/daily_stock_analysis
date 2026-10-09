@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 
 from starlette.responses import JSONResponse
 
-from src.workbench import is_manual_workbench
+from src.workbench import is_manual_workbench, is_native_research
 
 
 _READ = re.compile(
@@ -69,6 +69,9 @@ class ManualWorkbenchMiddleware:
             allowed = (scope["method"] in {"GET", "HEAD"} and bool(_READ.fullmatch(path))) or (
                 scope["method"] == "POST" and (path in _WRITE or re.fullmatch(r"/api/v1/workbench/cancel/[A-Za-z0-9_-]{1,100}", path))
             )
+            if is_native_research():
+                from src.services.research_routes import research_route_allowed
+                allowed = allowed or research_route_allowed(path, scope["method"])
             if not allowed:
                 reason = "This operation is disabled in the manual workbench"
         if path in {"/docs", "/redoc", "/openapi.json"}:

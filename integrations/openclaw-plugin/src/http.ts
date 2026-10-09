@@ -110,7 +110,7 @@ export function createDsaHttpHandler(config: DsaConfig, options: ProxyTestOption
     } catch (error) {
       if (res.headersSent) { res.destroy(); return true; }
       const status = error instanceof RequestError ? error.status : (error as NodeJS.ErrnoException)?.code === "ENOENT" ? 404 : 503;
-      if (status === 405) res.setHeader("Allow", isApp ? "GET, HEAD, POST (allowlisted API only)" : "GET, HEAD");
+      if (status === 405) res.setHeader("Allow", isApp ? "GET, HEAD, POST, PUT, DELETE (allowlisted API only)" : "GET, HEAD");
       send(res, status, JSON.stringify({ error: "dsa_workbench_request_rejected", message: error instanceof RequestError ? error.message : "DSA resource unavailable" }), "application/json; charset=utf-8", head, isApp);
       return true;
     }

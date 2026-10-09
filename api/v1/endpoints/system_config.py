@@ -57,6 +57,10 @@ def get_scheduler_status(
     scheduler: RuntimeSchedulerService = Depends(get_runtime_scheduler_service),
 ) -> dict:
     """Return runtime scheduler status."""
+    from src.workbench import is_native_research
+    if is_native_research():
+        from src.services.native_research import native_status
+        return native_status(scheduler)
     return scheduler.status()
 
 
@@ -378,6 +382,9 @@ def update_system_config(
     service: SystemConfigService = Depends(get_system_config_service),
 ) -> UpdateSystemConfigResponse:
     """Validate and persist system configuration updates."""
+    from src.workbench import is_native_research
+    if is_native_research() and not request.reload_now:
+        raise HTTPException(status_code=400, detail="Native UI settings must reconcile immediately")
     try:
         payload = service.update(
             config_version=request.config_version,

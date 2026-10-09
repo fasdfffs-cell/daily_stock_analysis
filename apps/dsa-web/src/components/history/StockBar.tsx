@@ -1,3 +1,4 @@
+import { MANUAL_WORKBENCH } from '../../utils/workbench';
 import type React from 'react';
 import { useState, useCallback, useRef, useEffect, useId } from 'react';
 import { Badge, Button, ScrollArea } from '../common';
@@ -104,7 +105,7 @@ export const StockBar: React.FC<StockBarProps> = ({
             }
           />
 
-          {items.length > 0 && onDeleteStock && (
+          {items.length > 0 && onDeleteStock && !MANUAL_WORKBENCH && (
             <div className="flex items-center gap-2">
               <label
                 className="flex flex-1 cursor-pointer items-center gap-2 rounded-lg px-2 py-1"
@@ -162,7 +163,7 @@ export const StockBar: React.FC<StockBarProps> = ({
 
               return (
                 <div key={`${code}-${item.id}`} className="flex items-start gap-2 group">
-                  {onDeleteStock && (
+                  {onDeleteStock && !MANUAL_WORKBENCH && (
                     <div className="pt-5">
                       <input
                         type="checkbox"

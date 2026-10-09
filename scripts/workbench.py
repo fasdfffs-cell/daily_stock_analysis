@@ -44,7 +44,7 @@ def prepare_environment(args, inherited):
         env_file.chmod(0o600)
     env = {k: inherited[k] for k in SAFE_INHERIT if k in inherited}
     env.update({
-        "DSA_RUNTIME_MODE": "manual_workbench", "HOME": str(runtime / "home"),
+        "DSA_RUNTIME_MODE": "native_research" if getattr(args, "native_research", False) else "manual_workbench", "HOME": str(runtime / "home"),
         "XDG_CONFIG_HOME": str(runtime / "home" / ".config"),
         "XDG_CACHE_HOME": str(runtime / "cache"), "XDG_DATA_HOME": str(runtime / "state"),
         "TMPDIR": str(runtime / "tmp"), "ENV_FILE": str(env_file),
@@ -66,6 +66,8 @@ def prepare_environment(args, inherited):
         "ENABLE_CHIP_DISTRIBUTION": "false", "SEARXNG_ENABLED": "false",
         "SOCIAL_SENTIMENT_ENABLED": "false", "INTELLIGENCE_ENABLED": "false",
         "REPORT_INTEGRITY_ENABLED": "false", "REPORT_INTEGRITY_RETRY": "0",
+        "TZ": "Asia/Shanghai" if getattr(args, "native_research", False) else "UTC",
+        "SCHEDULE_TIME": "19:00", "AGENT_EVENT_MONITOR_ENABLED": "false",
         "PORT": str(args.port), "PUBLIC_URL": args.public_url,
         "LITELLM_LOCAL_MODEL_COST_MAP": "true", "PYTHONNOUSERSITE": "1", "NO_COLOR": "1", "LOG_LEVEL": "INFO",
     })
@@ -74,6 +76,7 @@ def prepare_environment(args, inherited):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--native-research", action="store_true", help="Restore only the original native scheduler and approved research features; schedule defaults disabled")
     parser.add_argument("--port", type=int, default=int(os.getenv("PORT", "0")))
     parser.add_argument("--public-url", default=os.getenv("PUBLIC_URL", ""))
     parser.add_argument("--runtime-dir", default=str(ROOT / ".workbench"))
@@ -95,6 +98,9 @@ def main():
     os.umask(0o077)
     os.environ.clear()
     os.environ.update(env)
+    import time
+    if hasattr(time, "tzset"):
+        time.tzset()  # process-local only; never changes host timezone
     os.chdir(ROOT)
     sys.path[:0] = [str(ROOT), str(packages)]
     from src.config import setup_env, get_config

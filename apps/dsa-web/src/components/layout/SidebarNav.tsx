@@ -1,3 +1,4 @@
+import { MANUAL_WORKBENCH, NATIVE_RESEARCH, RESEARCH_ROUTES } from '../../utils/workbench';
 import React, { useState } from 'react';
 import { Activity, BarChart3, Bell, BriefcaseBusiness, Database, Gauge, Home, LogOut, MessageSquareQuote, Search, Settings2 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
@@ -85,7 +86,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
       </div>
 
       <nav className={cn('flex flex-col gap-1.5', isRail ? 'min-h-0 overflow-y-auto' : 'flex-1')} aria-label={t('layout.mainNav')}>
-        {NAV_ITEMS.map(({ key, labelKey, to, icon: Icon, exact, badge }) => {
+        {NAV_ITEMS.filter(item => !MANUAL_WORKBENCH || (NATIVE_RESEARCH ? RESEARCH_ROUTES.has(item.to) : item.to === '/')).map(({ key, labelKey, to, icon: Icon, exact, badge }) => {
           const label = t(labelKey);
           return (
           <NavLink

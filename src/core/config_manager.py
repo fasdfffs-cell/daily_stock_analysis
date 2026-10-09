@@ -183,8 +183,14 @@ class ConfigManager:
         """Apply updates into `.env` file using atomic replace when possible."""
         from src.workbench import is_manual_workbench
         updates = list(updates)
-        if is_manual_workbench() and any(key.upper() != "STOCK_LIST" for key, _ in updates):
+        from src.workbench import mutable_workbench_keys
+        if is_manual_workbench() and any(key.upper() not in mutable_workbench_keys() for key, _ in updates):
             raise RuntimeError("Manual workbench only permits watchlist configuration")
+        if is_manual_workbench():
+            from src.workbench import is_native_research
+            if is_native_research():
+                from src.services.native_research import validate_schedule_values
+                validate_schedule_values({k: v for k, v in updates if k != "STOCK_LIST"})
         with self._lock:
             current_values = self.read_config_map()
             stored_values = self._read_config_map(normalize_values=False)

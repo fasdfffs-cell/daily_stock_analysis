@@ -6,10 +6,11 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class PortfolioAccountCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
     name: str = Field(..., min_length=1, max_length=64)
     broker: Optional[str] = Field(None, max_length=64)
     market: Literal["cn", "hk", "us", "jp", "kr", "tw"] = "cn"
@@ -18,6 +19,7 @@ class PortfolioAccountCreateRequest(BaseModel):
 
 
 class PortfolioAccountUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
     name: Optional[str] = Field(None, min_length=1, max_length=64)
     broker: Optional[str] = Field(None, max_length=64)
     market: Optional[Literal["cn", "hk", "us", "jp", "kr", "tw"]] = None
@@ -43,6 +45,7 @@ class PortfolioAccountListResponse(BaseModel):
 
 
 class PortfolioTradeCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
     account_id: int
     symbol: str = Field(..., min_length=1, max_length=16)
     trade_date: date
@@ -58,6 +61,7 @@ class PortfolioTradeCreateRequest(BaseModel):
 
 
 class PortfolioCashLedgerCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
     account_id: int
     event_date: date
     direction: Literal["in", "out"]
@@ -67,6 +71,7 @@ class PortfolioCashLedgerCreateRequest(BaseModel):
 
 
 class PortfolioCorporateActionCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
     account_id: int
     symbol: str = Field(..., min_length=1, max_length=16)
     effective_date: date
@@ -171,6 +176,7 @@ class PortfolioPositionItem(BaseModel):
 
 
 class PortfolioPositionAnalysisRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
     account_id: Optional[int] = Field(None, description="Optional account id; required when a symbol is held in multiple accounts")
     analysis_phase: Literal["auto", "premarket", "intraday", "postmarket"] = "auto"
     force: bool = Field(False, description="Force refresh analysis inputs without bypassing duplicate in-flight tasks")

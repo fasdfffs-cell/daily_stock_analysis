@@ -478,6 +478,9 @@ class PortfolioService:
         read_only: bool = False,
     ) -> Dict[str, Any]:
         """Replay holdings; read-only callers skip live quotes and snapshot writes."""
+        from src.workbench import is_native_research
+        if is_native_research():
+            include_realtime, read_only = False, True
         as_of_date = as_of or date.today()
         method = self._normalize_cost_method(cost_method)
 
@@ -1088,6 +1091,9 @@ class PortfolioService:
             )
             last_price = price_info.price
             limitations = _portfolio_limitations_for_market(market)
+            from src.workbench import is_native_research
+            if is_native_research() and not price_info.is_available:
+                limitations = [*limitations, "missing_saved_price_not_zero_value"]
 
             if price_info.is_available:
                 local_market_value = qty * float(last_price)

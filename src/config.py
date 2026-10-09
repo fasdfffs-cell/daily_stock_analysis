@@ -884,9 +884,18 @@ def setup_env(override: bool = False):
         if not env_path:
             raise RuntimeError("Manual workbench requires an isolated ENV_FILE")
         values = dotenv_values(env_path, interpolate=False)
-        if set(values) - {"STOCK_LIST"}:
+        from src.workbench import mutable_workbench_keys
+        if set(values) - mutable_workbench_keys():
             raise RuntimeError("Manual workbench config only accepts STOCK_LIST")
         os.environ["STOCK_LIST"] = values.get("STOCK_LIST") or ""
+        from src.workbench import is_native_research
+        if is_native_research():
+            from src.services.native_research import validate_schedule_values
+            schedule_values = {key: str(value or "") for key, value in values.items() if key != "STOCK_LIST"}
+            validate_schedule_values(schedule_values)
+            os.environ["SCHEDULE_ENABLED"] = schedule_values.get("SCHEDULE_ENABLED", "false")
+            os.environ["SCHEDULE_TIME"] = schedule_values.get("SCHEDULE_TIME", "19:00")
+            os.environ["SCHEDULE_TIMES"] = ""
         return
     Config._capture_bootstrap_runtime_env_overrides()
     # src/config.py -> src/ -> root

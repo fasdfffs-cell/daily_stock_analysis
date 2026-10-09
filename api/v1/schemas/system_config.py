@@ -179,6 +179,7 @@ class ExportSystemConfigResponse(BaseModel):
 
 
 class SystemConfigUpdateItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """Single key-value update item."""
 
     key: str
@@ -219,6 +220,7 @@ class TestGenerationBackendResponse(BaseModel):
 
 
 class UpdateSystemConfigRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """Update request payload."""
 
     config_version: str

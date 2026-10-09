@@ -17,12 +17,13 @@ import { UiLanguageProvider, useUiLanguage } from './contexts/UiLanguageContext'
 import { useAgentChatStore } from './stores/agentChatStore';
 import { resolveLoginRedirect } from './utils/loginRedirect';
 import './App.css';
-import { MANUAL_WORKBENCH } from './utils/workbench';
+import { MANUAL_WORKBENCH, NATIVE_RESEARCH, RESEARCH_ROUTES } from './utils/workbench';
 import { WorkbenchDisabledPage } from './components/layout/WorkbenchNotice';
 import { appPath, WORKBENCH_BASE_PATH } from './utils/appBase';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
 const BacktestPage = lazy(() => import('./pages/BacktestPage'));
+const NativeSettingsPage = lazy(() => import('./pages/NativeSettingsPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
@@ -100,7 +101,7 @@ const routeChildren = [
   { path: '/backtest', element: <BacktestPage /> },
   { path: '/alerts', element: <AlertsPage /> },
   { path: '/usage', element: <TokenUsagePage /> },
-  { path: '/settings', element: <SettingsPage /> },
+  { path: '/settings', element: NATIVE_RESEARCH ? <NativeSettingsPage /> : <SettingsPage /> },
   { path: '*', element: <NotFoundPage /> },
 ];
 
@@ -116,7 +117,7 @@ const App: React.FC = () => {
       createBrowserRouter([
         {
           element: <AppContent />,
-          children: routeChildren.map((route) => MANUAL_WORKBENCH && route.path !== '/' && route.path !== '*'
+          children: routeChildren.map((route) => MANUAL_WORKBENCH && !(NATIVE_RESEARCH ? RESEARCH_ROUTES.has(route.path) : route.path === '/') && route.path !== '*'
             ? { ...route, element: <WorkbenchDisabledPage /> } : route),
         },
       ], { basename: WORKBENCH_BASE_PATH || '/' }),

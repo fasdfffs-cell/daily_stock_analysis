@@ -831,6 +831,9 @@ class BacktestService:
         return None
 
     def _try_fill_daily_data(self, *, code: str, analysis_date: date, eval_window_days: int) -> None:
+        from src.workbench import is_native_research
+        if is_native_research():
+            return  # Manual evaluation uses only locally saved bars; no online refill.
         refill_code = str(code or "").strip()
         if not refill_code:
             return

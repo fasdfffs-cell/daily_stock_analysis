@@ -454,6 +454,10 @@ class SystemConfigService:
 
     def get_config(self, include_schema: bool = True, mask_token: str = "******") -> Dict[str, Any]:
         """Return display config values with mask metadata for server-masked fields."""
+        from src.workbench import is_native_research
+        if is_native_research():
+            from src.services.native_research import scoped_config
+            return scoped_config(self, include_schema)
         saved_config_map = self._build_display_config_map(self._manager.read_config_map())
         runtime_config_map = self._build_runtime_display_config_map(saved_config_map)
         config_map = {
@@ -2050,6 +2054,10 @@ class SystemConfigService:
         reload_now: bool = True,
     ) -> Dict[str, Any]:
         """Validate and persist updates into `.env`, then reload runtime config."""
+        from src.workbench import is_native_research
+        if is_native_research():
+            from src.services.native_research import scoped_update
+            return scoped_update(self, config_version, items, reload_now)
         current_version = self._manager.get_config_version()
         if current_version != config_version:
             raise ConfigConflictError(current_version=current_version)

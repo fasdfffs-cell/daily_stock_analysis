@@ -241,12 +241,26 @@ async def app_lifespan(app: FastAPI):
     if is_manual_workbench():
         if not is_auth_enabled():
             raise RuntimeError("Manual workbench requires authentication")
-        app.state.system_config_service = SystemConfigService()
+        from src.workbench import is_native_research
+        if is_native_research():
+            from src.services.native_research import native_config, native_callback
+            app.state.runtime_scheduler_service = RuntimeSchedulerService(
+                config_provider=native_config, task_runner=native_callback,
+                inline_task_runner=True, schedule_timezone="Asia/Shanghai",
+                background_tasks_provider=lambda config: [],
+                schedule_args_overrides={"no_notify": True, "no_market_review": True},
+            )
+            app.state.runtime_scheduler_service.reconcile_from_config(run_immediately=False)
+        app.state.system_config_service = SystemConfigService(
+            runtime_scheduler=getattr(app.state, "runtime_scheduler_service", None))
         try:
             yield
         finally:
             from src.llm.openclaw_backend import cancel_all_model_runs
             cancel_all_model_runs()
+            if hasattr(app.state, "runtime_scheduler_service"):
+                app.state.runtime_scheduler_service.stop()
+                delattr(app.state, "runtime_scheduler_service")
             delattr(app.state, "system_config_service")
         return
     runtime_owns_schedule = os.getenv(CLI_SCHEDULER_OWNER_ENV, "").strip().lower() not in {

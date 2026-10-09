@@ -119,3 +119,72 @@ this source task does not restart or modify the running application.
 See `reports/dsa-qqq-schedule-20261009/` for offline evidence and the uncreated owner
 job draft. Actual scheduler disabled-task validation, live data/model execution,
 remote history visibility and eventual activation remain separate parent proofs.
+
+## Opt-in native research candidate (owner-reviewed cutover only)
+
+Build the same React application with `VITE_NATIVE_RESEARCH=true` (and
+`VITE_WORKBENCH_BASE_PATH=/plugins/dsa-workbench/app` for the existing Gateway
+entry), then add `--native-research` to the original `scripts/workbench.py`
+launch arguments. This opts into a narrowly restored original
+`RuntimeSchedulerService` and `SystemConfigService`, not `main.py`, a second cron
+framework, new daemon, OpenClaw automation or a new website. The native scheduler
+has its own original `schedule.Scheduler` instance with explicit Asia/Shanghai
+job timezone; launcher `TZ=Asia/Shanghai` is process-local, not a host change.
+No immediate generation, warmup, index refresh or event monitor starts.
+
+Native mode accepts only `STOCK_LIST`, `SCHEDULE_ENABLED`, `SCHEDULE_TIME` in the
+isolated `watchlist.env`. Missing schedule keys mean **disabled, 19:00**. Settings
+expose only the two schedule fields with the original field metadata and strict
+HH:MM validation; QQQ is explicitly fixed/read-only in this supported scope.
+Changing a timer never replaces ordinary AAPL/NVDA/etc watchlist entries.
+UI saves use the original service and reconcile without immediate execution.
+Calendar is pinned exchange_calendars 4.13.2, US equity holiday/early-close aware,
+and fails closed. Delayed/missed slots skip with no catch-up. The existing
+per-US-session receipt reserves failures and successes alike, preventing an
+automatic model retry. The trusted callback uses the original AnalysisService
+and saved history, notification final sinks stay disabled, and the managed CLI
+retains the shared single-model slot and 600-second ceiling. It never invokes
+`main.py` or creates a multiprocessing analysis runtime. Durable slot outcomes
+are projected safely after restart; new lifecycle status is not a historical
+promise of success. Existing naive DB timestamps are preserved; new process-local
+timezone timestamps are not silently migrated or reinterpreted.
+
+Research navigation opens home/history/watchlist, narrow settings, original
+portfolio and original backtest. Home watchlist bulk analysis submits one explicit
+symbol per request into the existing serial queue; whole-stock history deletion
+requires explicit UI confirmation. Bulk-ID and bulk-stock deletion controls are
+hidden. Portfolio permits local account/trade/cash/corporate-action ledger only,
+uses saved prices/FX and read-only snapshots; missing prices are marked unavailable
+and partial, not valid zero value. CSV/broker/FX online updates/position AI/risk
+extension are not opened. Manual backtests evaluate saved historical reports/bars;
+online bar refill is disabled and insufficient data remains insufficient. No
+Agent/chat/news/screening/alerts or automatic backtest is enabled. Data/usage are
+not opened: unknown usage is not represented as zero.
+
+Backend and Gateway proxy use exact method/path allowlists; authenticated cookie,
+per-request Access/Serve identity, fixed loopback/Origin, cookie path/Secure,
+request bounds and ordinary schemas remain. Nested schedule items are bounded;
+unknown request fields and non-finite portfolio/backtest numeric input are rejected.
+No full config export/import/provider fields/auth disabling is exposed. The plugin
+still has nine admin config properties and zero tools, actions or services.
+
+For an explicitly authorized owner staging schedule values without a password:
+
+```sh
+python3 scripts/native_research_config.py --runtime-dir "$PWD/.workbench"
+python3 scripts/native_research_config.py --runtime-dir "$PWD/.workbench" --enabled false --time 19:00
+# Only AFTER the old external schedule is disabled by its owner:
+python3 scripts/native_research_config.py --runtime-dir "$PWD/.workbench" --enabled true --time 19:00
+```
+
+The helper validates the exact existing owned file and applies only scoped fields
+through SystemConfigService/ConfigManager; it reads no auth files and performs no
+HTTP/admin-cookie bridge. **Externally staged helper changes require an authorized
+app restart**; they do not claim to hot-change a disabled running timer. First
+load and review must use disabled config. Parent alone snapshots DB with SQLite
+online backup/quick_check, reviews exact source/archive, loads the formal plugin
+artifact, verifies registered+disabled state, disables the old owner, then enables
+native through the UI or helper plus authorized app restart. Backend must stay up;
+no permanent service or downtime replay is provided by this candidate. Never leave
+both owners enabled. Source/build/fixture success is not production loading or
+financial-correctness proof.

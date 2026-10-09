@@ -44,7 +44,7 @@ test('public authoring factory retains strict complete metadata without invented
 
 test('actual host SDK composition registers only the original descriptor and guarded route', () => {
   const { descriptors, routes } = registration();
-  assert.deepEqual(descriptors, [{ surface: 'tab', id: 'dsa-workbench', label: '股票研究', description: '原 DSA 报告概览与完整私人手动工作台', icon: 'chart-line', group: 'agent', order: 40, path: '/plugins/dsa-workbench/', requiredScopes: ['operator.read'] }]);
+  assert.deepEqual(descriptors, [{ surface: 'tab', id: 'dsa-workbench', label: '股票研究', description: '原 DSA 报告与私人研究工作台 · 原生定时', icon: 'chart-line', group: 'agent', order: 40, path: '/plugins/dsa-workbench/', requiredScopes: ['operator.read'] }]);
   assert.equal(routes.length, 1); assert.equal(routes[0].path, '/plugins/dsa-workbench/');
   assert.equal(routes[0].match, 'prefix'); assert.equal(routes[0].auth, 'plugin');
 });

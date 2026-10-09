@@ -97,6 +97,8 @@ class Scheduler:
         schedule_times_provider: Optional[Callable[[], Union[Sequence[str], str]]] = None,
         register_signals: bool = True,
         pass_scheduled_for: bool = False,
+        timezone: Optional[str] = None,
+        isolated_schedule: bool = False,
     ):
         """
         初始化调度器
@@ -106,7 +108,8 @@ class Scheduler:
         """
         try:
             import schedule
-            self.schedule = schedule
+            self.schedule = schedule.Scheduler() if isolated_schedule else schedule
+            self._timezone = timezone
         except ImportError:
             logger.error("schedule 库未安装，请执行: pip install schedule")
             raise ImportError("请安装 schedule 库: pip install schedule")
@@ -172,7 +175,7 @@ class Scheduler:
         self._daily_jobs = []
 
     def _register_daily_job(self, schedule_time: str) -> Any:
-        job = self.schedule.every().day.at(schedule_time)
+        job = self.schedule.every().day.at(schedule_time, self._timezone) if self._timezone else self.schedule.every().day.at(schedule_time)
         # schedule updates next_run after the callback, so preserve the original
         # due date/time through delayed polling and asynchronous dispatch.
         return job.do(lambda: self._safe_run_task(scheduled_for=job.next_run))
@@ -451,6 +454,8 @@ def run_with_schedule(
     schedule_times: Optional[Sequence[str]] = None,
     schedule_times_provider: Optional[Callable[[], Union[Sequence[str], str]]] = None,
     pass_scheduled_for: bool = False,
+        timezone: Optional[str] = None,
+        isolated_schedule: bool = False,
 ):
     """
     便捷函数：使用定时调度运行任务

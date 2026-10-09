@@ -47,16 +47,17 @@ def calendar():
     return xc.get_calendar(name), name
 
 
-def context(now, cal, name):
+def context(now, cal, name, schedule_time="19:00"):
     if now.tzinfo is None:
         raise Closed('clock_requires_timezone')
     local = now.astimezone(SH)
-    slot = datetime.combine(local.date(), time(19), SH)
+    hour, minute = map(int, schedule_time.split(":"))
+    slot = datetime.combine(local.date(), time(hour, minute), SH)
     session = slot.astimezone(NY).date().isoformat()
     try:
         trading = bool(cal.is_session(session))
         previous = cal.date_to_session(session, direction='previous')
-        if trading:
+        if trading and cal.session_close(previous).to_pydatetime() > slot:
             previous = cal.previous_session(previous)
         latest = previous.date().isoformat()
         close = cal.session_close(session).isoformat() if trading else None
@@ -66,18 +67,19 @@ def context(now, cal, name):
             'scheduledAt': slot.isoformat(), 'nyScheduledAt': slot.astimezone(NY).isoformat(),
             'calendar': name, 'calendarVersion': '4.13.2', 'tradingSession': trading,
             'sessionClose': close, 'latestCompleteSession': latest,
-            'phase': 'premarket' if trading else 'closed',
-            'due': local.hour == 19 and local.minute == 0,
+            'phase': ('premarket' if slot < cal.session_open(session).to_pydatetime() else 'intraday' if slot < cal.session_close(session).to_pydatetime() else 'postmarket') if trading else 'closed',
+            'due': local.hour == hour and local.minute == minute,
             'news': 'not_connected', 'notify': False, 'declarationKey': KEY}
 
 
-def next_slot(now, cal, name):
+def next_slot(now, cal, name, schedule_time="19:00"):
     local = now.astimezone(SH)
     for offset in range(370):
-        slot = datetime.combine(local.date() + timedelta(days=offset), time(19), SH)
+        hour, minute = map(int, schedule_time.split(":"))
+        slot = datetime.combine(local.date() + timedelta(days=offset), time(hour, minute), SH)
         if slot <= local:
             continue
-        ctx = context(slot, cal, name)
+        ctx = context(slot, cal, name, schedule_time)
         if ctx['tradingSession']:
             return ctx['scheduledAt']
     raise Closed('next_session_unavailable')
@@ -246,7 +248,7 @@ def execute(ctx, cal, state, service_factory, busy=cli_busy):
             service = service_factory()
             result = service.analyze_stock(stock_code='QQQ', report_type='detailed',
                 force_refresh=False, query_id=query_id, send_notification=False,
-                analysis_phase='premarket', query_source='scheduled_local_owner')
+                analysis_phase=ctx['phase'], query_source='scheduled_local_owner')
             if not result or result.get('query_id') != query_id or result.get('stock_code') != 'QQQ':
                 raise Closed('analysis_failed')
             saved = history(state / 'analysis.db', query_id, ctx, cal)
