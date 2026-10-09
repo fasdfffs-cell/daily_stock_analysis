@@ -48,3 +48,74 @@ Stop the reported foreground service process with SIGTERM (or the execution proc
 ## Native same-origin OpenClaw entry
 
 The optional repository-owned [DSA Workbench plugin](../integrations/openclaw-plugin/README.md) adds a read-only stock-report sidebar and the **same-domain top-level original React app** at `/plugins/dsa-workbench/app/`. It is not another Portal/port/domain. Build with `VITE_WORKBENCH_BASE_PATH=/plugins/dsa-workbench/app` to produce separate `static-gateway/` assets; default root builds remain compatible. Every route uses the same private Access/Serve identity semantics as Todo/Parking, plus DSA mandatory login and strict browser Origin checks. The iframe stays read-only and supplies an explicit open/copy path; no Gateway credential bridge or sandbox change is needed. Build/validate with the public SDK, then use the exact path and SHA-256 from official `openclaw plugins pack` for parent/System artifact approval; source npm archives are not activation artifacts. The authorized host-management flow can perform reviewed installation and any managed Gateway restart, with human approval when required; a terminal is not inherently required. Keep the existing runtime untouched during authoring. Empty first installation is strictly inert: the whole-prefix route returns a fixed 503 without reading DB, serving the app, verifying identity or opening an agent/proxy. After artifact approval, parent sets complete scoped plugin config through the official System operation and performs the managed registration/restart step; both dbPath and staticDir must be explicit admin absolute paths and configured Access/Serve fields must satisfy the existing all-or-none identity parser before business activates; valid path-only local trust remains unchanged. No automatic inheritance from global config is used. An explicit optional admin-only `accessPolicySource` (`todo` or `parking-trends`) can project just six identity metadata fields from the enabled source in public `api.config`, without exposing the redacted audience through chat; direct fields conflict with that selector and absent/disabled/redacted/incomplete source remains inert. The existing per-request guards are unchanged. The complete unchanged app resources and literal overview CSS are carried inside the single bundled backend for byte-level review, while runtime static serving preserves the configured filesystem guard. Any later DSA launcher PUBLIC_URL change remains a separate authorized parent action. Security and activation/rollback details are in the integration docs.
+
+## Reviewed local QQQ scheduled entry (task creation separate)
+
+`scripts/scheduled_analysis.py` is a trusted **local process** entry, not an API
+or authentication bypass. It reuses `prepare_environment` with mandatory web
+authentication unchanged, isolated cached packages, agenta/default managed routing,
+max thinking, and the existing 600-second official adapter. The validated
+`http://localhost`/port 1 origin fields are unused configuration placeholders:
+this process starts no listener and imports no web authentication modules. No
+password, session secret, cookie or user credential is accepted/read by this entry.
+
+```sh
+python3 scripts/scheduled_analysis.py --self-test
+python3 scripts/scheduled_analysis.py --check
+# Only the separately authorized owner task executes this production command:
+python3 scripts/scheduled_analysis.py --symbol QQQ
+```
+
+The separate draft schedule is `0 19 * * 1-5`, timezone `Asia/Shanghai`, command
+execution timeout 900 seconds, no-output timeout at least 650 seconds, output
+limit 8192 bytes, delivery `none`. No agent/model wrapper surrounds this command.
+**No scheduler task is created by the source or these verification commands.**
+`--check` only returns calendar/context and the next eligible slot; it does not
+prepare an environment, open the DB, read auth, or reserve a production slot.
+`--self-test` uses temporary fixture state and fake analysis only, disallows network
+socket connection and auth-file reads, and never calls the official model CLI.
+Production has no fake clock/runtime-path/model override CLI arguments.
+
+At 19:00 Shanghai (any second in that minute), the New York date is the target US
+session (07:00 EDT or 06:00 EST). Other times skip, with no delayed catch-up. The
+installed `exchange_calendars==4.13.2` XNAS alias resolves to XNYS, sharing US equity
+holidays/half days; if XNAS is absent the explicit XNYS shared-equity calendar is
+used, never a weekday or China-holiday fallback. Calendar errors fail closed.
+Early closes remain eligible. 19:00 is a start time, not a finish-time promise or
+access to that night's closing bar. Existing source retrieval, original market
+snapshot date/model and history remain authoritative. Saved bar dates later than
+the last completed US session or on non-sessions cause explicit failure; stale
+complete bars are labelled stale, never relabelled to today's session. Existing
+naive `analysis_history.created_at` timestamps are preserved and disclosed as
+existing DB local time, separately from UTC runner start/elapsed time.
+
+Only QQQ is allowed. AnalysisService writes the **same**
+`.workbench/state/analysis.db` `analysis_history`, so ordinary history/report views
+can read it, with no replacement history table or edits to old rows/stock_daily
+uniqueness. No notifications, news, market review, realtime, trades or portfolios
+are enabled. The runner verifies exactly one saved QQQ/query-id row before success.
+Receipts contain references/hashes/source/model, not report bodies or prompts.
+
+Private receipts: `.workbench/state/scheduled-analysis/QQQ/<US-session>.json`
+(files 600, directories 700), serialized by nonblocking flock and atomically
+replaced/fsynced. `attempt: 0` is persisted **before** service/model work. A failed,
+busy or interrupted attempt occupies its date too; repeated invocation returns
+bounded `duplicate`/`NO_REPLY` metadata with exit 0 and preserves the original
+receipt/report. First busy returns exit 3; analysis/provenance/state errors exit 1.
+There is no automatic model retry or unbounded waiting queue. Correcting a failed
+slot is a separate reviewed recovery, not a built-in retry switch.
+
+The official backend now additionally uses a nonblocking private
+`model-generation.lock` shared by **newly loaded cooperating processes**, without
+increasing its existing in-process semaphore of one. A conservative same-user
+`/proc` check before scheduled analysis detects active official Gateway/model CLI
+waits, excluding serialized params from parsing and never reading environment.
+**This snapshot check is not a race-free lock against an already-running old web
+process**, and local CLI cancellation is not proof of provider cancellation. Do
+not claim full old/new application concurrency protection. Owner review must
+settle the old-process maintenance/overlap barrier before enabling the draft;
+this source task does not restart or modify the running application.
+
+See `reports/dsa-qqq-schedule-20261009/` for offline evidence and the uncreated owner
+job draft. Actual scheduler disabled-task validation, live data/model execution,
+remote history visibility and eventual activation remain separate parent proofs.

@@ -190,9 +190,15 @@ class OpenClawGenerationBackend:
         if not _GENERATION_SLOT.acquire(blocking=False):
             raise _error(GenerationErrorCode.UNKNOWN_BACKEND_ERROR, "Another model request is active", "execution")
         try:
-            return self._generate(prompt, generation_config, system_prompt=system_prompt, stream=stream,
-                                  stream_progress_callback=stream_progress_callback,
-                                  response_validator=response_validator, audit_context=audit_context)
+            from src.llm.workbench_lock import shared_model_slot
+            try:
+                with shared_model_slot():
+                    return self._generate(prompt, generation_config, system_prompt=system_prompt, stream=stream,
+                                          stream_progress_callback=stream_progress_callback,
+                                          response_validator=response_validator, audit_context=audit_context)
+            except (OSError, RuntimeError):
+                raise _error(GenerationErrorCode.UNKNOWN_BACKEND_ERROR,
+                             "Shared model slot busy or unavailable", "execution") from None
         finally:
             _GENERATION_SLOT.release()
 
